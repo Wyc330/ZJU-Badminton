@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  无障碍服务配置
+
+  关键点：
+  · canRetrieveWindowContent=true  能拿到界面节点树
+  · flagReportViewIds              能拿到 viewIdResourceName（原生页面用得上）
+  · flagRetrieveInteractiveWindows 可遍历所有窗口（弹窗、WebView 独立窗口）
+  · flagIncludeNotImportantViews   连"不重要"的视图也返回（H5 内容常被标为不重要）
+  · canPerformGestures=true        坐标点击兜底（H5/WebView 里 performAction(CLICK) 偶尔失效）
+  · notificationTimeout=60         事件节流，避免高频回调把主线程打满
+-->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged|typeViewClicked|typeViewFocused|typeViewScrolled"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:accessibilityFlags="flagDefault|flagReportViewIds|flagRetrieveInteractiveWindows|flagIncludeNotImportantViews"
+    android:canPerformGestures="true"
+    android:canRetrieveWindowContent="true"
+    android:canTakeScreenshot="true"
+    android:description="@string/a11y_service_description"
+    android:notificationTimeout="60"
+    android:settingsActivity="com.zju.courtgrab.MainActivity" />

@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">抢场地</string>
+    <string name="a11y_service_label">抢场地 · 自动预约助手</string>
+    <string name="a11y_service_description">用于在「浙大体艺」App 中自动完成羽毛球场地预约。开启后，本服务会读取屏幕上的文字与按钮、并模拟点击；不会上传任何数据，所有配置与日志仅保存在本机。</string>
+
+    <string name="title_status">运行状态</string>
+    <string name="title_task">本次任务</string>
+    <string name="title_log">运行日志</string>
+
+    <string name="status_ok">已开启</string>
+    <string name="status_bad">未开启</string>
+    <string name="status_unknown">检查中…</string>
+
+    <string name="item_a11y">无障碍服务</string>
+    <string name="item_exact_alarm">精确闹钟</string>
+    <string name="item_notify">通知权限</string>
+    <string name="item_overlay">后台拉起（悬浮窗）</string>
+    <string name="item_battery">电池优化白名单</string>
+    <string name="item_autostart">MIUI 自启动</string>
+
+    <string name="btn_open">去开启</string>
+    <string name="btn_refresh">刷新</string>
+
+    <string name="hint_invite_code">本次邀请码（5 位数字，留空则到点弹窗问你）</string>
+    <string name="label_alarm_time">每日触发时间</string>
+    <string name="label_switch_enabled">启用每日自动抢场地</string>
+    <string name="btn_start_now">立即试跑一次</string>
+    <string name="btn_stop">停止当前流程</string>
+    <string name="btn_dump">抓取当前界面节点树</string>
+    <string name="btn_dump_delayed">延时 5 秒抓取（先切到浙大体艺目标页）</string>
+    <string name="btn_share_dump">分享最近一次抓取</string>
+    <string name="btn_export_config">导出默认配置到下载目录</string>
+    <string name="btn_import_config">重新载入配置文件</string>
+    <string name="btn_clear_log">清空日志</string>
+    <string name="btn_test_date">计算今天的目标日期</string>
+
+    <string name="code_title">输入本次 5 位邀请码</string>
+    <string name="code_hint">邀请码</string>
+    <string name="code_ok">确定并继续</string>
+    <string name="code_skip">跳过（流程会因为缺码停下）</string>
+
+    <string name="notif_channel_flow">抢场地流程</string>
+    <string name="notif_channel_alarm">到点提醒</string>
+    <string name="notif_channel_result">结果通知</string>
+
+    <string name="toast_copied">已复制</string>
+</resources>

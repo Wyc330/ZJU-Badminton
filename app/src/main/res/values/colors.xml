@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="brand">#FF1A6FEB</color>
+    <color name="brand_dark">#FF0E4FA8</color>
+    <color name="bg">#FFF5F6F8</color>
+    <color name="card">#FFFFFFFF</color>
+    <color name="text_primary">#FF1B1D21</color>
+    <color name="text_secondary">#FF6B7280</color>
+    <color name="ok">#FF16A34A</color>
+    <color name="bad">#FFDC2626</color>
+    <color name="warn">#FFD97706</color>
+    <color name="divider">#FFE5E7EB</color>
+    <color name="log_bg">#FF111827</color>
+    <color name="log_text">#FFD1FAE5</color>
+</resources>

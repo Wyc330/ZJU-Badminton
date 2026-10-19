@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 简易矢量图标：蓝色圆角底 + 白色羽毛球 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#1A6FEB"
+        android:pathData="M0,24 A24,24 0 0 1 24,0 H84 A24,24 0 0 1 108,24 V84 A24,24 0 0 1 84,108 H24 A24,24 0 0 1 0,84 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,30 L66,46 L60,74 L48,74 L42,46 Z" />
+    <path
+        android:fillColor="#FFD54F"
+        android:pathData="M48,74 h12 v8 a6,6 0 0 1 -12,0 z" />
+    <path
+        android:fillColor="#1A6FEB"
+        android:pathData="M54,52 m-7,0 a7,7 0 1,0 14,0 a7,7 0 1,0 -14,0" />
+</vector>

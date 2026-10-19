@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- 抓取到的节点树（JSON/TXT）放在「应用外部目录」，
+         实际路径 /sdcard/Android/data/com.zju.courtgrab/files/dumps/，
+         电脑上可直接 adb pull，无需 root。分享时也走这里。 -->
+    <external-files-path name="dumps_ext" path="dumps/" />
+    <!-- 兼容早期内部目录 -->
+    <files-path name="dumps" path="dumps/" />
+</paths>
