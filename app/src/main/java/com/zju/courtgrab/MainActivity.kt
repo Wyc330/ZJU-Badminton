@@ -115,7 +115,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         // 权限跳转
-        b.btnA11y.setOnClickListener { Perms.openA11ySettings(this) }
+        b.btnA11y.setOnClickListener { openA11yWithGuide() }
         b.btnAlarmPerm.setOnClickListener { Perms.openExactAlarmSettings(this) }
         b.btnNotify.setOnClickListener { maybeAskNotificationPermission(true) }
         b.btnOverlay.setOnClickListener { Perms.openOverlaySettings(this) }
@@ -135,6 +135,30 @@ class MainActivity : AppCompatActivity() {
         b.btnReloadConfig.setOnClickListener { reloadConfig() }
         b.btnTestDate.setOnClickListener { previewDates() }
         b.btnClearLog.setOnClickListener { Logs.clear() }
+    }
+
+    /**
+     * 打开无障碍设置前先弹一次手动路径。
+     * 实测部分 HyperOS 机型上直接跳 ACTION_ACCESSIBILITY_SETTINGS 会落到 WLAN 设置页，
+     * 所以把「设置 → 无障碍 → 已下载的服务」这条路径明确写给用户，跳错了也能自己走。
+     */
+    private fun openA11yWithGuide() {
+        if (Perms.isA11yEnabled(this)) {
+            toast("无障碍服务已开启")
+            refreshStatus()
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle("开启无障碍服务")
+            .setMessage(
+                "手动路径：\n设置 → 更多设置 / 无障碍 → 已下载的服务（部分机型叫「已安装的服务」）" +
+                    " → 「抢场地 · 自动预约助手」→ 开启\n\n" +
+                    "如果点「去设置」跳到了别的页面（部分 HyperOS 会误跳到 WLAN），" +
+                    "请回到桌面按上面的路径手动进入；开启后回到本页会自动刷新状态。"
+            )
+            .setPositiveButton("去设置") { _, _ -> Perms.openA11ySettings(this) }
+            .setNegativeButton("取消", null)
+            .show()
     }
 
     // ───────────────────────── 状态刷新 ─────────────────────────

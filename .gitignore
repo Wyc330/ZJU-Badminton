@@ -20,3 +20,5 @@ test-*.log
 # 系统
 .DS_Store
 Thumbs.db
+# 工具临时锁文件
+.dsh-ops-*

@@ -231,6 +231,7 @@ class BookingFlow(
     }
 
     private suspend fun waitBookingPage() {
+        ensureTargetForeground("等待预约场地页")
         val node = ops.waitFor(cfg.bookingPageReady, cfg.navTimeoutMs, cfg.pollIntervalMs)
         if (node == null) {
             dumpQuietly("booking-page")
@@ -251,6 +252,7 @@ class BookingFlow(
      * 依次点，直到界面文字真的变化。
      */
     private suspend fun clickNav(name: String, locs: List<Locator>, timeoutMs: Long = cfg.stepTimeoutMs): Boolean {
+        ensureTargetForeground(name)
         val deadline = SystemClock.elapsedRealtime() + timeoutMs
         do {
             val nodes = ops.collect()
@@ -284,6 +286,7 @@ class BookingFlow(
 
     /** 选择型点击：点一下就行（校区/场馆/场地/按钮），不要求界面文字变化 */
     private suspend fun clickSelect(name: String, locs: List<Locator>): HNode {
+        ensureTargetForeground(name)
         Log("  定位：${locs.joinToString(" || ") { it.describe() }}")
         val node = ops.waitFor(locs, cfg.stepTimeoutMs, cfg.pollIntervalMs)
             ?: throw FlowException(
@@ -296,6 +299,31 @@ class BookingFlow(
         }
         delay(350)
         return node
+    }
+
+    /**
+     * 确保目标 App 在前台。
+     *
+     * 实测踩到的坑：用户中途切回「抢场地」看日志（或从通知点进来）时，
+     * 目标 App 会退到后台，无障碍就看不到它的窗口 → 「选择时段」直接报
+     * 「还原不出时段表」。现在遇到这种情况会主动重新拉起目标 App 再继续。
+     */
+    private suspend fun ensureTargetForeground(where: String): Boolean {
+        val fg = ops.foregroundPackage()
+        if (fg == cfg.targetPackage) return true
+        Logs.w(TAG, "  [$where] 目标 App 不在前台（当前=${fg ?: "?"}），自动重新拉起")
+        BgLaunch.openTarget(ctx, cfg)
+        val deadline = SystemClock.elapsedRealtime() + cfg.navTimeoutMs
+        while (SystemClock.elapsedRealtime() < deadline) {
+            if (ops.foregroundPackage() == cfg.targetPackage) {
+                delay(700)
+                Log("  [$where] 已回到目标 App，继续执行")
+                return true
+            }
+            delay(cfg.pollIntervalMs)
+        }
+        Logs.e(TAG, "  [$where] 拉不起目标 App，当前前台=${ops.foregroundPackage() ?: "?"}")
+        return false
     }
 
     private fun screenSig(): Int =
@@ -326,6 +354,7 @@ class BookingFlow(
 
     /** 用 `<`/`>` 箭头把日期移动到 target；返回最终停在哪天 */
     private suspend fun navigateToDate(target: LocalDate): LocalDate? {
+        ensureTargetForeground("切换日期")
         var current = readDisplayedDate() ?: return null
         if (current == target) {
             Log("日期已经是 $target")
@@ -516,6 +545,7 @@ class BookingFlow(
      * 把格子和行标题按垂直重叠配对 → 得到 (行, 列) → 截图上取每格中心颜色 → 判状态。
      */
     private suspend fun tryPickSlotByCells(fridayOnly: Boolean): SlotPick? {
+        ensureTargetForeground("选择时段")
         val nodes = ops.collect()
         val labelRegex = cfg.slotRowLabel.textRegex?.let { runCatching { Regex(it) }.getOrNull() }
         val labels = nodes
@@ -536,7 +566,7 @@ class BookingFlow(
                 n.snap.visible
         }
         if (labels.isEmpty() || cells.isEmpty()) {
-            Log("  行标题=${labels.size} 格子=${cells.size}，还原不出时段表")
+            Log("  行标题=${labels.size} 格子=${cells.size}，还原不出时段表（当前前台=${ops.foregroundPackage() ?: "?"}）")
             return null
         }
         val rows = SlotGridGeometry.group(cells.map { CellBox(it.snap.bounds.toBox()) }, labels)
@@ -708,6 +738,7 @@ class BookingFlow(
     }
 
     private suspend fun waitCompanionPage() {
+        ensureTargetForeground("等待同伴信息页")
         val node = ops.waitFor(cfg.companionPageReady, cfg.navTimeoutMs, cfg.pollIntervalMs)
         if (node == null) {
             dumpQuietly("companion-page")

@@ -3,6 +3,7 @@ package com.zju.courtgrab.util
 import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
+import android.content.ComponentName
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -11,10 +12,13 @@ import android.provider.Settings
 import android.text.TextUtils
 import androidx.core.app.NotificationManagerCompat
 import com.zju.courtgrab.a11y.VenueAccessibilityService
+import com.zju.courtgrab.core.Logs
 import com.zju.courtgrab.core.Prefs
 
 /** 权限 / 系统设置检查与跳转（含 MIUI 的几个私人入口） */
 object Perms {
+
+    private const val TAG = "Perms"
 
     fun isA11yEnabled(context: Context): Boolean {
         if (VenueAccessibilityService.instance != null) return true
@@ -45,8 +49,41 @@ object Perms {
     fun areNotificationsEnabled(context: Context): Boolean =
         NotificationManagerCompat.from(context).areNotificationsEnabled()
 
+    /**
+     * 打开系统「无障碍」设置。
+     *
+     * 部分 MIUI / HyperOS 机型上直接发 ACTION_ACCESSIBILITY_SETTINGS 会跳错页面
+     * （实测有跳到 WLAN 设置的），所以这里：
+     *   1) 先解析并打印真实会跳去的 Activity（日志里能看到）
+     *   2) 解析不到 / 启动失败时，依次尝试 AOSP 的显式组件
+     *   3) 还不行就退到「应用详情」页，并提示手动路径
+     */
     fun openA11ySettings(context: Context) {
-        safeStart(context, Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+        val action = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val resolved = runCatching { action.resolveActivity(context.packageManager) }.getOrNull()
+        val target = resolved?.let { "${it.packageName}/${it.className}" } ?: "(未解析到)"
+        Logs.i(TAG, "无障碍设置跳转目标：$target")
+        if (runCatching { context.startActivity(action) }.isSuccess) return
+
+        val components = listOf(
+            ComponentName("com.android.settings", "com.android.settings.Settings\$AccessibilitySettingsActivity"),
+            ComponentName("com.android.settings", "com.android.settings.accessibility.AccessibilitySettingsActivity"),
+            ComponentName("com.android.settings", "com.android.settings.MiuiAccessibilitySettingsActivity"),
+        )
+        for (cn in components) {
+            val it = Intent().setComponent(cn).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            if (runCatching { context.startActivity(it) }.isSuccess) {
+                Logs.i(TAG, "改用显式组件打开无障碍设置：$cn")
+                return
+            }
+        }
+        Logs.w(TAG, "无法直接打开无障碍设置，退到应用详情页")
+        safeStart(
+            context,
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                .setData(Uri.parse("package:${context.packageName}")),
+        )
     }
 
     fun openExactAlarmSettings(context: Context) {
