@@ -34,7 +34,7 @@ data class GrabConfig(
         Locator(textContains = "暂不"),
         Locator(textContains = "跳过"),
     ),
-    val popupRounds: Int = 5,
+    val popupRounds: Int = 3,
 
     // ③ 首页 / 登录态 ────────────────────────────────────────────────────────
     /** 实测：首页九宫格里第三行第四个是「场馆服务」；标题 id 来自安装包 */
@@ -81,6 +81,11 @@ data class GrabConfig(
         Locator(textContains = "紫金港校区", note = "实测：默认选中，点一下确保"),
     ),
     val campusOptional: Boolean = true,
+    /**
+     * 是否真的点一下校区 tab。
+     * 实测默认就选中紫金港，而点它会让整个时段表重新加载 → 拖慢抢场地，所以默认不点。
+     */
+    val campusClick: Boolean = false,
 
     // ⑥⑦ 场馆 / 场地 ─────────────────────────────────────────────────────────
     /** 实测：场馆行里的「风雨操场」 */
@@ -92,6 +97,11 @@ data class GrabConfig(
         Locator(textContains = "羽毛球场", note = "实测：场地按钮"),
         Locator(textContains = "羽毛球", note = "兜底"),
     ),
+    /**
+     * 点完「风雨操场」后，如果时段表已经出现，就跳过点「羽毛球场」
+     * （实测该场地只有一个选项且默认已选中）。
+     */
+    val skipCourtClickIfGridReady: Boolean = true,
 
     // ⑧ 日期（实测：左右箭头 + 中间日期框，不是日期格子）─────────────────────
     /** 实测：日期框显示 2026-10-19 这种格式；`<` / `>` 按钮各移动一天 */
@@ -173,7 +183,7 @@ data class GrabConfig(
     /** 时段格的上午/下午识别（周五只看下午） */
     val slotCfg: SlotConfig = SlotConfig(),
     /** 点完是否再截一次图确认格子变成「已选择」色 */
-    val slotVerifyByRecapture: Boolean = true,
+    val slotVerifyByRecapture: Boolean = false,
 
     // ⑩ 底部勾选 ─────────────────────────────────────────────────────────────
     /** 实测：底部「☑ 已阅读并同意 预约须知」 */
@@ -249,11 +259,11 @@ data class GrabConfig(
     // ⏱ 节奏参数 ─────────────────────────────────────────────────────────────
     val stepTimeoutMs: Long = 12_000,
     val navTimeoutMs: Long = 20_000,
-    val pollIntervalMs: Long = 220,
-    val afterClickDelayMs: Long = 550,
-    val afterNavDelayMs: Long = 900,
+    val pollIntervalMs: Long = 150,
+    val afterClickDelayMs: Long = 320,
+    val afterNavDelayMs: Long = 550,
     /** 截图最小间隔（系统限制约 333ms） */
-    val screenshotIntervalMs: Long = 450,
+    val screenshotIntervalMs: Long = 330,
     val inviteCodeWaitMs: Long = 120_000,
     val submitVerifyMs: Long = 8_000,
 ) {

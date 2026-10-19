@@ -30,6 +30,7 @@ import kotlinx.coroutines.delay
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.temporal.ChronoUnit
 import kotlin.math.abs
 
 /** 流程触发来源 */
@@ -88,15 +89,21 @@ class BookingFlow(
         step("① 启动目标 App") { launchTarget() }
         step("② 关闭弹窗") { dismissPopups() }
         step("③ 等待首页") { waitHome() }
-        step("④ 进入场馆服务") { clickNav("进入场馆服务", cfg.entryService) }
+        step("④ 进入场馆服务") { clickNav("进入场馆服务", cfg.entryService, expected = cfg.entryBooking + cfg.bookingPageReady) }
 
         step("⑤ 关闭弹窗（预约须知）") { dismissPopups() }
-        step("⑥ 进入场馆预约") { clickNav("进入场馆预约", cfg.entryBooking) }
+        step("⑥ 进入场馆预约") { clickNav("进入场馆预约", cfg.entryBooking, expected = cfg.bookingPageReady) }
         step("⑦ 关闭弹窗") { dismissPopups() }
         step("⑧ 等待预约场地页") { waitBookingPage() }
         step("⑨ 确认校区") { selectCampus() }
         step("⑩ 选择风雨操场") { clickSelect("选择风雨操场", cfg.venueFengYu) }
-        step("⑪ 选择羽毛球场") { clickSelect("选择羽毛球场", cfg.venueBadminton) }
+        step("⑪ 选择羽毛球场") {
+                    if (cfg.skipCourtClickIfGridReady && ops.findAll(cfg.slotRowLabel).isNotEmpty()) {
+                        Log("时段表已就绪，跳过点「羽毛球场」（默认已选中）")
+                    } else {
+                        clickSelect("选择羽毛球场", cfg.venueBadminton)
+                    }
+                }
         step("⑫ 关闭弹窗") { dismissPopups() }
         step("⑫½ 等到 ${cfg.releaseHour}:${"%02d".format(cfg.releaseMinute)} 放号") { waitForRelease() }
 
@@ -206,8 +213,8 @@ class BookingFlow(
             }
             if (hit == null) return
             Log("关闭弹窗（匹配 ${hitLocator?.describe()}）：${hit.snap.summary()}")
-            ops.click(hit, 350)
-            delay(400)
+            ops.click(hit, 250)
+            delay(250)
         }
     }
 
@@ -242,7 +249,6 @@ class BookingFlow(
             )
         }
         Log("预约页就绪：${node.snap.summary()}")
-        delay(cfg.afterNavDelayMs)
     }
 
     // ─────────────────────────── 通用点击 ───────────────────────────
@@ -251,7 +257,12 @@ class BookingFlow(
      * 导航型点击：可能命中多个节点（比如页面标题和九宫格图标都叫「场馆预约」），
      * 依次点，直到界面文字真的变化。
      */
-    private suspend fun clickNav(name: String, locs: List<Locator>, timeoutMs: Long = cfg.stepTimeoutMs): Boolean {
+    private suspend fun clickNav(
+        name: String,
+        locs: List<Locator>,
+        expected: List<Locator> = emptyList(),
+        timeoutMs: Long = cfg.stepTimeoutMs,
+    ): Boolean {
         ensureTargetForeground(name)
         val deadline = SystemClock.elapsedRealtime() + timeoutMs
         do {
@@ -261,21 +272,23 @@ class BookingFlow(
                 if (loc.isEmpty) continue
                 val idxs = LocatorMatcher.candidateIndexes(snaps, loc)
                 if (idxs.isEmpty()) continue
-                Log("  候选 ${idxs.size} 个：${idxs.take(4).joinToString(" | ") { nodes[it].snap.summary() }}")
-                val before = screenSig()
-                for (idx in idxs.take(5)) {
+                for (idx in idxs.take(4)) {
                     val h = nodes[idx]
                     if (!ops.click(h, cfg.afterClickDelayMs)) continue
-                    delay(450)
-                    if (screenSig() != before) {
-                        Log("  ✔ 有效点击：${h.snap.summary()}")
+                    if (expected.isEmpty()) {
+                        Log("  ✔ 已点击：${h.snap.summary()}")
                         delay(cfg.afterNavDelayMs)
                         return true
                     }
+                    val ready = ops.waitFor(expected, 2600, 120)
+                    if (ready != null) {
+                        Log("  ✔ 点击生效：${h.snap.summary()} → ${ready.snap.summary()}")
+                        return true
+                    }
+                    Logs.w(TAG, "  点了 ${h.snap.summary()} 但目标页未出现，试下一个候选")
                 }
-                Logs.w(TAG, "  $name：点完界面没变化，继续等")
             }
-            delay(cfg.pollIntervalMs)
+            delay(120)
         } while (SystemClock.elapsedRealtime() < deadline)
         dumpQuietly("click-$name")
         throw FlowException(
@@ -297,7 +310,7 @@ class BookingFlow(
         if (!ops.click(node, cfg.afterClickDelayMs)) {
             throw FlowException(name, "点击失败：${node.snap.summary()}")
         }
-        delay(350)
+        delay(200)
         return node
     }
 
@@ -340,9 +353,13 @@ class BookingFlow(
             }
             throw FlowException("确认校区", "找不到校区「${cfg.campusTarget}」")
         }
+        if (!cfg.campusClick) {
+            Log("校区已是「${cfg.campusTarget}」（默认选中，跳过点击避免整页重刷）：${node.snap.summary()}")
+            return
+        }
         Log("点校区：${node.snap.summary()}")
         ops.click(node, cfg.afterClickDelayMs)
-        delay(600)
+        delay(300)
     }
 
     // ─────────────────────────── 日期 ───────────────────────────
@@ -361,26 +378,38 @@ class BookingFlow(
             return current
         }
         var guard = 0
-        while (current != target && guard++ < 12) {
-            val forward = current.isBefore(target)
-            val before = current
-            var after: LocalDate? = null
-            // 先用节点定位点箭头；不行再按不同比例坐标点击（不同机型布局略有差异）
-            for (attempt in 0 until 3) {
+        while (current != target && guard++ < 8) {
+            val delta = ChronoUnit.DAYS.between(current, target)
+            val forward = delta > 0
+            val clicks = kotlin.math.abs(delta).toInt().coerceIn(1, 3)
+            // 快速连点，不逐次回读；点完统一校验一次
+            repeat(clicks) {
+                tapDateArrow(forward, 0)
+                delay(150)
+            }
+            delay(200)
+            val after = readDisplayedDate()
+            if (after != null && after != current) {
+                current = after
+                Log("  日期 → $current（本轮连点 $clicks 次${if (forward) "下一天" else "上一天"}）")
+                continue
+            }
+            // 连点无效：换坐标比例补点（布局差异兜底）
+            var fixed = false
+            for (attempt in 1..2) {
                 tapDateArrow(forward, attempt)
                 delay(cfg.afterClickDelayMs)
-                val d = readDisplayedDate() ?: run { delay(400); readDisplayedDate() }
-                if (d != null && d != before) {
-                    after = d
+                val a2 = readDisplayedDate()
+                if (a2 != null && a2 != current) {
+                    current = a2
+                    fixed = true
                     break
                 }
             }
-            if (after == null) {
-                Log("箭头没生效（当前 $before），可能已到预约窗口边界")
+            if (!fixed) {
+                Log("箭头没生效（当前 $current），可能已到预约窗口边界")
                 break
             }
-            current = after
-            Log("  日期：$before → $after")
         }
         delay(300)
         return current
@@ -450,7 +479,7 @@ class BookingFlow(
         }
         Log("到放号点，刷新页面（等新数据回来）")
         tapRefresh()
-        delay(1200)
+        delay(900)
         dismissPopups()
     }
 
@@ -520,7 +549,7 @@ class BookingFlow(
             }
             Log("  第 $attempt 次没看到绿色格，刷新后重试")
             tapRefresh()
-            delay(900)
+            delay(700)
             dismissPopups()
         }
     }
@@ -803,7 +832,7 @@ class BookingFlow(
 
         // 3) 确定
         clickSelect("点击确定", cfg.btnConfirm)
-        delay(cfg.afterClickDelayMs)
+        delay(300)
     }
 
     private suspend fun verifyResult() {

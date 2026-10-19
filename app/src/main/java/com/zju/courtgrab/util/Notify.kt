@@ -28,6 +28,7 @@ object Notify {
     private const val CH_FLOW = "ch_flow"
     private const val CH_ALARM = "ch_alarm"
     private const val CH_RESULT = "ch_result"
+    private const val CH_RESULT_HIGH = "ch_result_high"
 
     const val ID_FOREGROUND = 1001
     const val ID_CODE_REQUEST = 1002
@@ -53,6 +54,15 @@ object Notify {
             nm.createNotificationChannel(
                 NotificationChannel(CH_RESULT, "结果通知", NotificationManager.IMPORTANCE_DEFAULT).apply {
                     description = "预约结果"
+                }
+            )
+            // 抢场地结束时的强提醒（声音+震动+弹横幅）
+            nm.createNotificationChannel(
+                NotificationChannel(CH_RESULT_HIGH, "抢场地结束提醒", NotificationManager.IMPORTANCE_HIGH).apply {
+                    description = "抢场地流程结束时的明确提示"
+                    enableVibration(true)
+                    vibrationPattern = longArrayOf(0, 300, 150, 300, 150, 500)
+                    enableLights(true)
                 }
             )
         }.onFailure { Logs.w(TAG, "创建通知渠道失败：${it.message}") }
@@ -126,11 +136,14 @@ object Notify {
     fun showResult(context: Context, success: Boolean, text: String) {
         ensureChannels(context)
         if (!canNotify(context)) return
-        val builder = NotificationCompat.Builder(context, CH_RESULT)
+        val builder = NotificationCompat.Builder(context, CH_RESULT_HIGH)
             .setSmallIcon(R.drawable.ic_launcher)
-            .setContentTitle(if (success) "预约流程完成" else "预约流程失败")
+            .setContentTitle(if (success) "✅ 抢场地完成" else "❌ 抢场地失败")
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
+            .setVibrate(longArrayOf(0, 300, 150, 300, 150, 500))
             .setAutoCancel(true)
             .setContentIntent(mainIntent(context))
         runCatching {
@@ -155,6 +168,21 @@ object Notify {
         runCatching {
             NotificationManagerCompat.from(context).notify(ID_RESULT, builder.build())
         }.onFailure { Logs.w(TAG, "showDumpDone: ${it.message}") }
+    }
+
+    /** 结束震动：成功/失败不同节奏，抢场地结束时能立刻察觉 */
+    fun vibrateDone(context: Context, success: Boolean) {
+        runCatching {
+            val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                context.getSystemService(android.os.VibratorManager::class.java)?.defaultVibrator
+            } else {
+                @Suppress("DEPRECATION")
+                context.getSystemService(Context.VIBRATOR_SERVICE) as? android.os.Vibrator
+            }
+            if (vibrator == null || !vibrator.hasVibrator()) return
+            val pattern = if (success) longArrayOf(0, 300, 150, 300, 150, 500) else longArrayOf(0, 900)
+            vibrator.vibrate(android.os.VibrationEffect.createWaveform(pattern, -1))
+        }.onFailure { Logs.w(TAG, "vibrateDone: ${it.message}") }
     }
 
     fun cancelFlowNotification(context: Context) {

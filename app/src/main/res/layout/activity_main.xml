@@ -378,6 +378,17 @@
                 android:textColor="@color/text_secondary"
                 android:textSize="12sp" />
 
+            <TextView
+                android:id="@+id/tvFlowState"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:background="@color/bg"
+                android:padding="10dp"
+                android:text="上次结果：还没跑过"
+                android:textColor="@color/text_primary"
+                android:textSize="13sp" />
+
             <CheckBox
                 android:id="@+id/cbDryRun"
                 android:layout_width="match_parent"

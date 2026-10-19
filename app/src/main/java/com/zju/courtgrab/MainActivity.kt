@@ -25,6 +25,8 @@ import com.zju.courtgrab.alarm.AlarmScheduler
 import com.zju.courtgrab.core.ConfigJson
 import com.zju.courtgrab.core.ConfigRepo
 import com.zju.courtgrab.core.DatePlanner
+import com.zju.courtgrab.core.FlowBus
+import com.zju.courtgrab.core.FlowState
 import com.zju.courtgrab.core.GrabConfig
 import com.zju.courtgrab.core.Logs
 import com.zju.courtgrab.core.Prefs
@@ -50,6 +52,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private lateinit var b: ActivityMainBinding
+    /** 已经弹过提示的流程结束时间，避免重复弹 */
+    private var lastShownFinish = 0L
     private lateinit var prefs: Prefs
     private var cfg: GrabConfig = GrabConfig.DEFAULT
 
@@ -66,6 +70,7 @@ class MainActivity : AppCompatActivity() {
 
         bindUi()
         observeLogs()
+        collectFlowState()
         maybeAskNotificationPermission()
         Logs.i(TAG, "主界面已打开，无障碍已连接=${VenueAccessibilityService.isConnected}")
     }
@@ -397,6 +402,37 @@ class MainActivity : AppCompatActivity() {
                 "周五会只挑下午时段（dateCfg.fridayAfternoonOnly=true）；" +
                 "窗口内没有周五/六/日时本次不抢（requirePreferredWeekday）。",
         )
+    }
+
+    // ───────────────────────── 流程状态 / 完成提示 ─────────────────────────
+
+    private fun collectFlowState() {
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                FlowBus.state.collect { st -> renderFlowState(st) }
+            }
+        }
+    }
+
+    private fun renderFlowState(st: FlowState) {
+        b.tvFlowState.text = when {
+            st.running -> "⏳ 流程运行中…（请不要切走；切走会自动把浙大体艺拉回来）"
+            st.success == null -> "上次结果：还没跑过"
+            st.success -> "✅ 上次成功：${st.message}"
+            else -> "❌ 上次失败：${st.message}"
+        }
+        if (!st.running && st.success != null && st.finishedAt > lastShownFinish) {
+            lastShownFinish = st.finishedAt
+            refreshStatus()
+            refreshNextRun()
+            if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+                AlertDialog.Builder(this)
+                    .setTitle(if (st.success) "✅ 抢场地完成" else "❌ 抢场地失败")
+                    .setMessage(st.message)
+                    .setPositiveButton("知道了", null)
+                    .show()
+            }
+        }
     }
 
     // ───────────────────────── 日志 ─────────────────────────

@@ -192,8 +192,10 @@ object ConfigJson {
         put("campusTarget", cfg.campusTarget)
         put("campusSelect", locatorsToJson(cfg.campusSelect))
         put("campusOptional", cfg.campusOptional)
+        put("campusClick", cfg.campusClick)
         put("venueFengYu", locatorsToJson(cfg.venueFengYu))
         put("venueBadminton", locatorsToJson(cfg.venueBadminton))
+        put("skipCourtClickIfGridReady", cfg.skipCourtClickIfGridReady)
         put("dateDisplay", locatorToJson(cfg.dateDisplay))
         put("dateArrowFallbackRatio", cfg.dateArrowFallbackRatio)
         put("dateCfg", dateCfgToJson(cfg.dateCfg))
@@ -259,8 +261,10 @@ object ConfigJson {
         campusTarget = json.str("campusTarget", base.campusTarget),
         campusSelect = json.locators("campusSelect", base.campusSelect),
         campusOptional = json.bool("campusOptional", base.campusOptional),
+        campusClick = json.bool("campusClick", base.campusClick),
         venueFengYu = json.locators("venueFengYu", base.venueFengYu),
         venueBadminton = json.locators("venueBadminton", base.venueBadminton),
+        skipCourtClickIfGridReady = json.bool("skipCourtClickIfGridReady", base.skipCourtClickIfGridReady),
         dateDisplay = json.locator("dateDisplay", base.dateDisplay),
         dateArrowFallbackRatio = json.flt("dateArrowFallbackRatio", base.dateArrowFallbackRatio),
         dateCfg = json.optJSONObject("dateCfg")?.let { dateCfgFromJson(base.dateCfg, it) } ?: base.dateCfg,

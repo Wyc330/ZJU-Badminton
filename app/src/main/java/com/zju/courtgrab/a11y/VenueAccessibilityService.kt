@@ -3,6 +3,7 @@ package com.zju.courtgrab.a11y
 import android.accessibilityservice.AccessibilityService
 import android.view.accessibility.AccessibilityEvent
 import com.zju.courtgrab.core.ConfigRepo
+import com.zju.courtgrab.core.FlowBus
 import com.zju.courtgrab.core.Logs
 import com.zju.courtgrab.flow.BookingFlow
 import com.zju.courtgrab.flow.FlowException
@@ -108,6 +109,7 @@ class VenueAccessibilityService : AccessibilityService() {
             var message = ""
             try {
                 Logs.i(TAG, "===== 流程开始（$trigger）=====")
+                FlowBus.running("正在自动预约…")
                 Notify.showFlowRunning(applicationContext, "正在自动预约…")
                 BookingFlow(this@VenueAccessibilityService, trigger).run()
                 success = true
@@ -126,7 +128,9 @@ class VenueAccessibilityService : AccessibilityService() {
             } finally {
                 val cost = System.currentTimeMillis() - startAt
                 Logs.i(TAG, "===== 流程结束：${if (success) "成功" else "未成功"}，耗时 ${cost}ms =====")
+                FlowBus.done(success, "$message（耗时 ${cost / 1000}s）")
                 Notify.showResult(applicationContext, success, "$message（耗时 ${cost / 1000}s）")
+                Notify.vibrateDone(applicationContext, success)
                 Notify.cancelFlowNotification(applicationContext)
                 running.set(false)
             }
@@ -137,6 +141,7 @@ class VenueAccessibilityService : AccessibilityService() {
     fun stopFlow(reason: String) {
         Logs.w(TAG, "请求停止流程：$reason")
         flowJob?.cancel()
+        FlowBus.done(false, "流程被手动停止")
         running.set(false)
     }
 
