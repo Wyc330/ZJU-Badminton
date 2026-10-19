@@ -1,5 +1,14 @@
 # 更新记录
 
+## 0.9.0alpha10 — 2026-10-20
+
+### 修复：漏了 INTERNET 权限（WebView 登录页报 ERR_CACHE_MISS）
+- 之前 App 只做无障碍自动化，从未联网，manifest 里一直没声明 `INTERNET`
+- 结果：内置登录页加载 `http://www.tyys.zju.edu.cn/venue/login` 直接报 `net::ERR_CACHE_MISS`，
+  直连接口同样会被系统拦
+- 本版补上 `INTERNET` + `ACCESS_NETWORK_STATE`；WebView 显式用 `LOAD_DEFAULT` 缓存策略，
+  并加了 onReceivedError 日志便于以后排障
+
 ## 0.9.0alpha9 — 2026-10-20
 
 ### 直连模式增强：按真实用户节奏轮询

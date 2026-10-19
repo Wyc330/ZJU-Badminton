@@ -4,6 +4,9 @@
 
     <!-- ========== 权限 ========== -->
     <!-- 精确定时：Android 12+ 需要用户在系统设置里授予「闹钟和提醒」 -->
+    <!-- 直连下单 / 内置 WebView 登录需要联网（之前漏了，导致 WebView 报 ERR_CACHE_MISS） -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <!-- Android 14 起全屏 Intent 需要声明（用于到点自动弹起页面） -->
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />

@@ -43,6 +43,7 @@ class VenueLoginActivity : AppCompatActivity() {
             useWideViewPort = true
             loadWithOverviewMode = true
             userAgentString = userAgentString // 保持系统 WebView 默认 UA（与真实 H5 一致）
+            cacheMode = android.webkit.WebSettings.LOAD_DEFAULT
         }
         CookieManager.getInstance().setAcceptCookie(true)
         CookieManager.getInstance().setAcceptThirdPartyCookies(b.webView, true)
@@ -50,6 +51,16 @@ class VenueLoginActivity : AppCompatActivity() {
         b.webView.webViewClient = object : WebViewClient() {
             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                 b.tvStatus.text = "正在加载：${url ?: ""}"
+            }
+
+            override fun onReceivedError(
+                view: WebView?,
+                request: android.webkit.WebResourceRequest?,
+                error: android.webkit.WebResourceError?,
+            ) {
+                val desc = error?.description?.toString() ?: "?"
+                Logs.w(TAG, "WebView 加载失败：${request?.url} code=${error?.errorCode} $desc")
+                b.tvStatus.text = "加载失败（${error?.errorCode}）：$desc"
             }
 
             override fun onPageFinished(view: WebView?, url: String?) {
