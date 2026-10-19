@@ -80,6 +80,31 @@ class ConfigJsonTest {
     }
 
     @Test
+    fun `legacy config (no schema) ignores changed default of requirePreferredWeekday`() {
+        // v1 时代的导出文件里写着 true，但这批用户从没主动改过它 → 必须按新默认 false 处理
+        val legacy = JSONObject("""{"targetPackage":"net.crigh.mysport","requirePreferredWeekday":true}""")
+        val cfg = ConfigJson.merge(GrabConfig.DEFAULT, legacy)
+        assertEquals(false, cfg.requirePreferredWeekday)
+        assertEquals("net.crigh.mysport", cfg.targetPackage)
+    }
+
+    @Test
+    fun `schema 2 config honors requirePreferredWeekday`() {
+        val current = JSONObject("""{"_schemaVersion":2,"requirePreferredWeekday":true}""")
+        val cfg = ConfigJson.merge(GrabConfig.DEFAULT, current)
+        assertEquals(true, cfg.requirePreferredWeekday)
+    }
+
+    @Test
+    fun `exported config carries schema version`() {
+        val json = ConfigJson.toJson(GrabConfig.DEFAULT)
+        assertEquals(ConfigJson.SCHEMA_VERSION, json.optInt("_schemaVersion", -1))
+        // 导出一份再读回来，语义不变
+        val back = ConfigJson.merge(GrabConfig.DEFAULT, json)
+        assertEquals(GrabConfig.DEFAULT.requirePreferredWeekday, back.requirePreferredWeekday)
+    }
+
+    @Test
     fun `preview lists next friday saturday sunday`() {
         val monday = LocalDateTime.of(2026, 10, 19, 8, 0)
         val s = DatePlanner.preview(monday, GrabConfig.DEFAULT.dateCfg)

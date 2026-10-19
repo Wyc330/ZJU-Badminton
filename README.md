@@ -1,13 +1,13 @@
-# 抢场地 · 浙大体艺羽毛球场地自动预约（0.9.0alpha1）
+# 抢场地 · 浙大体艺羽毛球场地自动预约（0.9.0alpha2）
 
 <sub>项目代号：**π = 3.14** · 仓库：<https://github.com/Wyc330/ZJU-Badminton> · 协议：[MIT](LICENSE)</sub>
 
-📦 **下载 APK**：[Releases · 0.9.0alpha1](https://github.com/Wyc330/ZJU-Badminton/releases/latest) —— `app-0.9.0alpha1-debug.apk`
+📦 **下载 APK**：[Releases · 0.9.0alpha2](https://github.com/Wyc330/ZJU-Badminton/releases/latest) —— `app-0.9.0alpha2-debug.apk`
 
 Android 原生工程（Kotlin），用无障碍服务在「浙大体艺」里自动完成羽毛球场地预约；
 到点由精确闹钟唤醒，全自动点完流程，最后停在「提交订单」之后（按需求：不支付）。
 
-**0.9.0alpha1 是按 2026-10-19 的真机截图 + 真机 dump + 放号规则写的**：流程顺序、按钮文案、日期切换方式、
+**0.9.0alpha2 是按 2026-10-19 的真机截图 + 真机 dump + 放号规则写的**：流程顺序、按钮文案、日期切换方式、
 放号节奏、时段表识别方式全部按实测结果。单测 46 个全过，APK 可直接装。
 
 ---
@@ -31,7 +31,7 @@ Android 原生工程（Kotlin），用无障碍服务在「浙大体艺」里自
 
 ---
 
-## 二、完整流程（0.9.0alpha1）
+## 二、完整流程（0.9.0alpha2）
 
 ```
 ① 启动/切到浙大体艺（net.crigh.mysport）

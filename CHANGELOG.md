@@ -1,5 +1,16 @@
 # 更新记录
 
+## 0.9.0alpha2 — 2026-10-19
+
+### 修复
+- **旧配置文件把新默认值顶掉**：v1.1/v1.2 导出的 `grab-config.json` 里写着
+  `requirePreferredWeekday: true`，升级后仍然生效，导致「窗口里没有周五/六/日」直接放弃。
+  现在配置带 `_schemaVersion`，旧配置里该键被忽略，并自动升级写回。
+- 失败抓取的 dump 文件名保留中文步骤名（如 `...-fail-选择日期.json`），方便定位。
+
+### 变更
+- 版本号规则：`0.9.0alphaX`，`versionCode` 跟 alpha 序号（alpha1 → 1，alpha2 → 2）。
+
 ## 0.9.0alpha1 — 2026-10-19
 
 首个公开版本（α）。目标 App：浙大体艺 `net.crigh.mysport` v2.9.7。

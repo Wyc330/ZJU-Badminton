@@ -39,12 +39,18 @@ object ConfigRepo {
         var cfg = GrabConfig.DEFAULT
         val candidates = listOf(internalConfigFile(context), externalConfigFile(context))
         var loadedFrom: File? = null
+        var legacyFile: File? = null
         for (f in candidates) {
             if (!f.exists()) continue
             runCatching {
                 val text = f.readText().removePrefix("\uFEFF").trim()
                 if (text.isBlank()) return@runCatching
                 val json = JSONObject(text)
+                val schema = json.optInt("_schemaVersion", 1)
+                if (schema < ConfigJson.SCHEMA_VERSION) {
+                    legacyFile = f
+                    Logs.w(TAG, "配置文件是旧版本（schema=$schema < ${ConfigJson.SCHEMA_VERSION}）：${f.absolutePath}")
+                }
                 cfg = ConfigJson.merge(cfg, json)
                 loadedFrom = f
             }.onFailure {
@@ -55,7 +61,14 @@ object ConfigRepo {
             Logs.i(TAG, "未找到配置文件，使用默认配置并导出一份到外部目录")
             runCatching { writeExternal(context, ConfigJson.toJson(cfg)) }
         } else {
-            Logs.i(TAG, "已载入配置：${loadedFrom!!.absolutePath}")
+            Logs.i(TAG, "已载入配置：${loadedFrom!!.absolutePath}（schema=${ConfigJson.SCHEMA_VERSION}）")
+        }
+        // 旧配置自动升级：写回新 schema，否则旧值会一直顶掉新默认值
+        if (legacyFile != null) {
+            runCatching {
+                writeExternal(context, ConfigJson.toJson(cfg))
+                Logs.i(TAG, "旧配置已升级到 schema=${ConfigJson.SCHEMA_VERSION} 并写回外部目录")
+            }.onFailure { Logs.e(TAG, "旧配置升级写回失败", it) }
         }
         current = cfg
         return cfg

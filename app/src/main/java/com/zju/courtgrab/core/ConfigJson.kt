@@ -10,6 +10,16 @@ import java.time.DayOfWeek
  */
 object ConfigJson {
 
+    /**
+     * 配置 schema 版本。
+     *
+     * 每次「默认值语义发生变化」就 +1，并在 [merge] 里对旧 schema 的对应键忽略文件里的值、
+     * 改用新默认值；否则用户手机上那份旧 grab-config.json 会把新默认值顶掉。
+     *
+     * v2：requirePreferredWeekday 默认从 true 改成 false（窗口里没有周五/六/日时也照抢）
+     */
+    const val SCHEMA_VERSION = 2
+
     // ───────────── Locator ⇄ JSON ─────────────
 
     fun locatorToJson(l: Locator): JSONObject = JSONObject().apply {
@@ -187,6 +197,7 @@ object ConfigJson {
         put("dateDisplay", locatorToJson(cfg.dateDisplay))
         put("dateArrowFallbackRatio", cfg.dateArrowFallbackRatio)
         put("dateCfg", dateCfgToJson(cfg.dateCfg))
+        put("_schemaVersion", SCHEMA_VERSION)
         put("requirePreferredWeekday", cfg.requirePreferredWeekday)
         put("preferFreshDates", cfg.preferFreshDates)
         put("releaseHour", cfg.releaseHour)
@@ -228,7 +239,13 @@ object ConfigJson {
         put("submitVerifyMs", cfg.submitVerifyMs)
     }
 
-    fun merge(base: GrabConfig, json: JSONObject): GrabConfig = base.copy(
+    fun merge(base: GrabConfig, json: JSONObject): GrabConfig {
+        // 旧版配置文件没有 _schemaVersion：视为 v1
+        val schema = json.optInt("_schemaVersion", 1)
+        return mergeWithSchema(base, json, schema)
+    }
+
+    private fun mergeWithSchema(base: GrabConfig, json: JSONObject, schema: Int): GrabConfig = base.copy(
         targetPackage = json.str("targetPackage", base.targetPackage),
         targetActivity = json.str("targetActivity", base.targetActivity),
         launchTimeoutMs = json.lng("launchTimeoutMs", base.launchTimeoutMs),
@@ -247,7 +264,12 @@ object ConfigJson {
         dateDisplay = json.locator("dateDisplay", base.dateDisplay),
         dateArrowFallbackRatio = json.flt("dateArrowFallbackRatio", base.dateArrowFallbackRatio),
         dateCfg = json.optJSONObject("dateCfg")?.let { dateCfgFromJson(base.dateCfg, it) } ?: base.dateCfg,
-        requirePreferredWeekday = json.bool("requirePreferredWeekday", base.requirePreferredWeekday),
+        // v2 改了默认值：旧配置里这个键不可信，直接用新默认值
+        requirePreferredWeekday = if (schema >= 2) {
+            json.bool("requirePreferredWeekday", base.requirePreferredWeekday)
+        } else {
+            base.requirePreferredWeekday
+        },
         preferFreshDates = json.bool("preferFreshDates", base.preferFreshDates),
         releaseHour = json.int("releaseHour", base.releaseHour),
         releaseMinute = json.int("releaseMinute", base.releaseMinute),
