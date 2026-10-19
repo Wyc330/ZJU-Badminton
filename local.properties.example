@@ -1,0 +1,9 @@
+# 复制为 local.properties 后，把 sdk.dir 改成你机器上的 Android SDK 路径。
+# 注意：Properties 文件按 ISO-8859-1 读取，路径里的中文必须写成 \uXXXX 转义
+#       （详见 README「编译与测试」一节）。
+#
+# Windows 示例（纯 ASCII 路径）：
+# sdk.dir=C\:\\Users\\you\\AppData\\Local\\Android\\Sdk
+#
+# macOS / Linux 示例：
+# sdk.dir=/Users/you/Library/Android/sdk

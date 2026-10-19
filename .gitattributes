@@ -1,0 +1,24 @@
+# 默认：交给 git 自动判断文本/二进制
+* text=auto
+
+# Windows 脚本保持 CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Linux/macOS 脚本保持 LF
+*.sh text eol=lf
+
+# Kotlin / Gradle / XML 统一 LF
+*.kt text eol=lf
+*.kts text eol=lf
+*.xml text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+*.properties text eol=lf
+
+# 二进制
+*.jar binary
+*.png binary
+*.jpg binary
+*.apk binary
+*.zip binary
