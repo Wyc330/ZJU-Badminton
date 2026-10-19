@@ -22,6 +22,7 @@
     </queries>
 
     <application
+        android:usesCleartextTraffic="true"
         android:name=".App"
         android:allowBackup="false"
         android:icon="@drawable/ic_launcher"
