@@ -105,6 +105,30 @@ class BookingFlow(
                     }
                 }
         step("⑫ 关闭弹窗") { dismissPopups() }
+        step("⑫¼ 预热（提前勾好「已阅读并同意」）") {
+            if (cfg.turboMode) {
+                ensureAgreeChecked()
+                Log("预热完成：同意勾选已就绪，放号后只做 刷新→切日期→点格子→我要预约")
+            }
+        }
+        // 预热 2：放号前先试着把日期切到目标（有些时段窗口提前就允许切，
+        // 这样 09:00:00 之后只剩「刷新 → 点格子」两件事）
+        if (cfg.turboMode) {
+            val warmDate = DatePlanner.windowCandidates(
+                LocalDateTime.now(), cfg.dateCfg, cfg.dateCfg.maxDaysAhead,
+                cfg.requirePreferredWeekday, cfg.preferFreshDates,
+            ).firstOrNull()
+            if (warmDate != null) {
+                step("⑫⅜ 预热（提前切日期）") {
+                    val reached = navigateToDate(warmDate)
+                    if (reached == warmDate) {
+                        Log("预热成功：日期已在 $warmDate，放号后不用再切")
+                    } else {
+                        Log("预热未生效（当前 $reached，放号前可能不允许切），放号后会重试")
+                    }
+                }
+            }
+        }
         step("⑫½ 等到 ${cfg.releaseHour}:${"%02d".format(cfg.releaseMinute)} 放号") { waitForRelease() }
 
         val now = LocalDateTime.now()
@@ -385,9 +409,9 @@ class BookingFlow(
             // 快速连点，不逐次回读；点完统一校验一次
             repeat(clicks) {
                 tapDateArrow(forward, 0)
-                delay(150)
+                delay(90)
             }
-            delay(200)
+            delay(120)
             val after = readDisplayedDate()
             if (after != null && after != current) {
                 current = after
@@ -446,6 +470,15 @@ class BookingFlow(
         return ops.tap(x.toFloat(), anchorBox.centerY.toFloat())
     }
 
+    /** 界面里选的目标时间段（如 18:30）→ 分钟数；留空返回 null（走中间优先） */
+    private fun preferredSlotMinute(): Int? {
+        val raw = prefs.preferredSlotStart.ifBlank { cfg.preferredSlotStart }.trim()
+        if (raw.isEmpty()) return null
+        val minute = SlotGridGeometry.parseStartMinute(raw)
+        if (minute == null) Logs.w(TAG, "  preferredSlotStart=「$raw」解析不出时间，改用中间优先")
+        return minute
+    }
+
     /** 当前屏幕上「可点击且够大」的节点矩形，用于几何找邻居 */
     private fun clickableBoxesOnScreen(): List<Box> = ops.collect()
         .asSequence()
@@ -479,7 +512,7 @@ class BookingFlow(
         }
         Log("到放号点，刷新页面（等新数据回来）")
         tapRefresh()
-        delay(900)
+        delay(if (cfg.turboMode) 350 else 900)
         dismissPopups()
     }
 
@@ -632,7 +665,7 @@ class BookingFlow(
         }
         cap.recycle(bitmap)
 
-        val pick = SlotGrid.decide(samples, cfg.slotGridCfg, cfg.slotCfg, fridayOnly) { Log("  $it") }
+        val pick = SlotGrid.decide(samples, cfg.slotGridCfg, cfg.slotCfg, fridayOnly, preferredSlotMinute()) { Log("  $it") }
             ?: return null
         Log("  ✔ ${pick.reason}")
         ops.tap(pick.cell.x.toFloat(), pick.cell.y.toFloat())
@@ -677,7 +710,7 @@ class BookingFlow(
                 )
             }
         cap.recycle(bitmap)
-        val pick = SlotGrid.decide(rows, cfg.slotGridCfg, cfg.slotCfg, fridayOnly) { Log("  $it") }
+        val pick = SlotGrid.decide(rows, cfg.slotGridCfg, cfg.slotCfg, fridayOnly, preferredSlotMinute()) { Log("  $it") }
             ?: return null
         Log("  ✔ ${pick.reason}")
         ops.tap(pick.cell.x.toFloat(), pick.cell.y.toFloat())

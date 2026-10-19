@@ -8,6 +8,8 @@ import android.text.Editable
 import android.text.InputType
 import android.text.TextWatcher
 import android.view.View
+import android.widget.AdapterView
+import android.widget.ArrayAdapter
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.NumberPicker
@@ -107,6 +109,9 @@ class MainActivity : AppCompatActivity() {
         b.cbDryRun.isChecked = prefs.dryRun
         b.cbDryRun.setOnCheckedChangeListener { _, checked -> prefs.dryRun = checked }
 
+        // 「想预约的时间段」下拉框（任意场地，按时段优先）
+        setupSlotTimeSpinner()
+
         b.swEnabled.isChecked = prefs.enabled
         b.swEnabled.setOnCheckedChangeListener { _, checked ->
             prefs.enabled = checked
@@ -140,6 +145,31 @@ class MainActivity : AppCompatActivity() {
         b.btnReloadConfig.setOnClickListener { reloadConfig() }
         b.btnTestDate.setOnClickListener { previewDates() }
         b.btnClearLog.setOnClickListener { Logs.clear() }
+    }
+
+    /** 时间段下拉框：保存到 Prefs，抢场地时按它优先选那一行（场地号随意） */
+    private fun setupSlotTimeSpinner() {
+        val starts = listOf(
+            "07:30", "08:30", "09:30", "10:30", "11:50", "13:30", "14:30",
+            "15:30", "16:30", "17:30", "18:30", "19:30", "20:30", "21:30",
+        )
+        val options = listOf("不限（取中间）") + starts.map { "$it 开始" }
+        val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, options)
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        b.spSlotTime.adapter = adapter
+
+        val saved = prefs.preferredSlotStart
+        val index = if (saved.isBlank()) 0 else options.indexOfFirst { it.startsWith(saved) }.let { if (it < 0) 0 else it }
+        b.spSlotTime.setSelection(index, false)
+
+        b.spSlotTime.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                prefs.preferredSlotStart = if (position == 0) "" else options[position].substringBefore(" ")
+                Logs.i(TAG, "目标时间段 = " + (prefs.preferredSlotStart.ifBlank { "不限（取中间）" }))
+            }
+
+            override fun onNothingSelected(parent: AdapterView<*>?) = Unit
+        }
     }
 
     /**

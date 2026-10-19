@@ -219,6 +219,8 @@ object ConfigJson {
         put("slotGridCfg", slotGridCfgToJson(cfg.slotGridCfg))
         put("slotCfg", slotCfgToJson(cfg.slotCfg))
         put("slotVerifyByRecapture", cfg.slotVerifyByRecapture)
+        put("preferredSlotStart", cfg.preferredSlotStart)
+        put("turboMode", cfg.turboMode)
         put("agreeCheckbox", locatorsToJson(cfg.agreeCheckbox))
         put("btnBookNow", locatorsToJson(cfg.btnBookNow))
         put("companionPageReady", locatorsToJson(cfg.companionPageReady))
@@ -293,6 +295,8 @@ object ConfigJson {
             ?.let { slotGridCfgFromJson(base.slotGridCfg, it) } ?: base.slotGridCfg,
         slotCfg = json.optJSONObject("slotCfg")?.let { slotCfgFromJson(base.slotCfg, it) } ?: base.slotCfg,
         slotVerifyByRecapture = json.bool("slotVerifyByRecapture", base.slotVerifyByRecapture),
+        preferredSlotStart = json.str("preferredSlotStart", base.preferredSlotStart),
+        turboMode = json.bool("turboMode", base.turboMode),
         agreeCheckbox = json.locators("agreeCheckbox", base.agreeCheckbox),
         btnBookNow = json.locators("btnBookNow", base.btnBookNow),
         companionPageReady = json.locators("companionPageReady", base.companionPageReady),

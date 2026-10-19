@@ -51,6 +51,11 @@ class Prefs private constructor(context: Context) {
         get() = sp.getBoolean("remember_code", false)
         set(v) = sp.edit().putBoolean("remember_code", v).apply()
 
+    /** 想预约的时间段（界面下拉框选择），如 "18:30"；空 = 取中间 */
+    var preferredSlotStart: String
+        get() = sp.getString("preferred_slot_start", "").orEmpty()
+        set(v) = sp.edit().putString("preferred_slot_start", v).apply()
+
     /** 演练模式：走到「提交订单」前就停，不真正下单（调试期强烈建议开着） */
     var dryRun: Boolean
         get() = sp.getBoolean("dry_run", true)

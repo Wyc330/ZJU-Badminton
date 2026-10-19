@@ -184,6 +184,16 @@ data class GrabConfig(
     val slotCfg: SlotConfig = SlotConfig(),
     /** 点完是否再截一次图确认格子变成「已选择」色 */
     val slotVerifyByRecapture: Boolean = false,
+    /**
+     * 想预约的时间段开始时间，如 "18:30"（随便哪个场地都行）。
+     * 留空 = 取中间偏后的空闲时段。主界面下拉框里可以选，无需改这里。
+     */
+    val preferredSlotStart: String = "",
+    /**
+     * 极速模式：提前把「已阅读并同意」勾好；放号瞬间只做
+     * 刷新 → 切日期 → 点格子 → 我要预约 这四件事。
+     */
+    val turboMode: Boolean = true,
 
     // ⑩ 底部勾选 ─────────────────────────────────────────────────────────────
     /** 实测：底部「☑ 已阅读并同意 预约须知」 */
@@ -259,9 +269,9 @@ data class GrabConfig(
     // ⏱ 节奏参数 ─────────────────────────────────────────────────────────────
     val stepTimeoutMs: Long = 12_000,
     val navTimeoutMs: Long = 20_000,
-    val pollIntervalMs: Long = 150,
-    val afterClickDelayMs: Long = 320,
-    val afterNavDelayMs: Long = 550,
+    val pollIntervalMs: Long = 110,
+    val afterClickDelayMs: Long = 160,
+    val afterNavDelayMs: Long = 350,
     /** 截图最小间隔（系统限制约 333ms） */
     val screenshotIntervalMs: Long = 330,
     val inviteCodeWaitMs: Long = 120_000,

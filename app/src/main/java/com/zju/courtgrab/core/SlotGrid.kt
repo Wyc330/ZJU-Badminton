@@ -159,6 +159,7 @@ object SlotGrid {
         cfg: SlotGridConfig,
         slotCfg: SlotConfig,
         fridayAfternoonOnly: Boolean,
+        preferredStartMinute: Int? = null,
         log: (String) -> Unit = {},
     ): SlotPick? {
         if (rows.isEmpty()) {
@@ -191,9 +192,17 @@ object SlotGrid {
             }
         }
 
-        // 最接近中间优先
+        // 排序策略：指定了目标时间段 → 按时间接近度；否则取最接近中间
         val mid = (considered.size - 1) / 2.0
-        val ordered = considered.sortedBy { abs(considered.indexOf(it) - mid) }
+        val ordered = if (preferredStartMinute != null) {
+            log("优先指定时间段 %02d:%02d（任意场地）".format(preferredStartMinute / 60, preferredStartMinute % 60))
+            considered.sortedWith(
+                compareBy<SlotRowSamples> { abs(it.rowIndex - preferredStartMinute) }
+                    .thenBy { it.rowIndex }
+            )
+        } else {
+            considered.sortedBy { abs(considered.indexOf(it) - mid) }
+        }
         log("尝试顺序（从中间向两边）：${ordered.mapNotNull { it.rowLabel }.joinToString(" ")}")
 
         for (row in ordered) {
