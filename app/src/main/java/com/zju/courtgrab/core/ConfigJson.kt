@@ -223,6 +223,10 @@ object ConfigJson {
         put("turboMode", cfg.turboMode)
         put("directVenueName", cfg.directVenueName)
         put("directVenueSiteId", cfg.directVenueSiteId)
+        put("directMaxWaitMs", cfg.directMaxWaitMs)
+        put("directPollMinMs", cfg.directPollMinMs)
+        put("directPollJitterMs", cfg.directPollJitterMs)
+        put("directMaxAttempts", cfg.directMaxAttempts)
         put("agreeCheckbox", locatorsToJson(cfg.agreeCheckbox))
         put("btnBookNow", locatorsToJson(cfg.btnBookNow))
         put("companionPageReady", locatorsToJson(cfg.companionPageReady))
@@ -301,6 +305,10 @@ object ConfigJson {
         turboMode = json.bool("turboMode", base.turboMode),
         directVenueName = json.str("directVenueName", base.directVenueName),
         directVenueSiteId = json.optLong("directVenueSiteId", base.directVenueSiteId),
+        directMaxWaitMs = json.optLong("directMaxWaitMs", base.directMaxWaitMs),
+        directPollMinMs = json.optLong("directPollMinMs", base.directPollMinMs),
+        directPollJitterMs = json.optLong("directPollJitterMs", base.directPollJitterMs),
+        directMaxAttempts = json.optInt("directMaxAttempts", base.directMaxAttempts),
         agreeCheckbox = json.locators("agreeCheckbox", base.agreeCheckbox),
         btnBookNow = json.locators("btnBookNow", base.btnBookNow),
         companionPageReady = json.locators("companionPageReady", base.companionPageReady),

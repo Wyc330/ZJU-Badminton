@@ -189,6 +189,14 @@ data class GrabConfig(
      * 留空 = 取中间偏后的空闲时段。主界面下拉框里可以选，无需改这里。
      */
     val preferredSlotStart: String = "",
+    /** 直连下单的轮询总时长（毫秒）：从放号时刻起最多重试这么久 */
+    val directMaxWaitMs: Long = 120_000,
+    /** 直连重试时每轮之间的最小间隔（毫秒） */
+    val directPollMinMs: Long = 250,
+    /** 直连重试的随机抖动上限（毫秒），实际间隔 = directPollMinMs + random(0..jitter) */
+    val directPollJitterMs: Long = 400,
+    /** 直连最多尝试轮数（与 directMaxWaitMs 一起兜底，避免无限请求） */
+    val directMaxAttempts: Int = 240,
     /** 直连下单时匹配的场馆名称（接口里按名字找 id） */
     val directVenueName: String = "风雨操场",
     /** 直连下单时直接指定场馆 id（0=自动按名称匹配） */
