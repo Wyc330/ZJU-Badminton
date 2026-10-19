@@ -23,10 +23,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * 到点后要求输入「本次 5 位邀请码」的全屏页。
+ * 到点后要求输入「本次 5 位同伴码」的全屏页。
  *
  * 两种情况：
- *   · 流程正卡在「填邀请码」这一步 → 输入后交给 [InviteCodeGate]，流程继续点确定
+ *   · 流程正卡在「填同伴码」这一步 → 输入后交给 [InviteCodeGate]，流程继续点确定
  *   · 到点触发但流程还没开始   → 输入后直接启动流程
  *
  * 页面带 showWhenLocked/turnScreenOn，所以手机锁屏时也会亮屏弹出来（但解锁密码仍需你自己按）。
@@ -99,7 +99,7 @@ class CodeRequestActivity : AppCompatActivity() {
                 left--
             }
             if (!isFinishing) {
-                Logs.w(TAG, "等待邀请码超时，跳过")
+                Logs.w(TAG, "等待同伴码超时，跳过")
                 InviteCodeGate.skip()
                 finish()
             }
@@ -109,14 +109,14 @@ class CodeRequestActivity : AppCompatActivity() {
     private fun submit() {
         val code = b.etCode.text.toString().trim()
         if (code.length != 5 || code.any { !it.isDigit() }) {
-            b.tvError.text = "请输入 5 位数字邀请码"
+            b.tvError.text = "请输入 5 位数字同伴码"
             return
         }
         b.tvError.text = ""
         prefs.inviteCode = code
         prefs.lastCode = code
         val delivered = InviteCodeGate.provide(code)
-        Logs.i(TAG, "已输入邀请码（5 位）；当前有流程在等=$delivered")
+        Logs.i(TAG, "已输入同伴码（5 位）；当前有流程在等=$delivered")
         countdownJob?.cancel()
 
         if (!delivered) {
@@ -131,7 +131,7 @@ class CodeRequestActivity : AppCompatActivity() {
     }
 
     private fun skipAndFinish() {
-        Logs.w(TAG, "用户跳过了邀请码输入")
+        Logs.w(TAG, "用户跳过了同伴码输入")
         countdownJob?.cancel()
         InviteCodeGate.skip()
         finish()

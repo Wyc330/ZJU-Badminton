@@ -77,7 +77,9 @@ object ConfigJson {
         put("weekdayPriority", JSONArray().apply { c.weekdayPriority.forEach { put(it.name) } })
         put("includeToday", c.includeToday)
         put("maxDaysAhead", c.maxDaysAhead)
+        put("releaseDaysAhead", c.releaseDaysAhead)
         put("fridayAfternoonOnly", c.fridayAfternoonOnly)
+        put("useNextReleaseDate", c.useNextReleaseDate)
         put("datePatterns", JSONArray().apply { c.datePatterns.forEach { put(it) } })
         put("todayWords", JSONArray().apply { c.todayWords.forEach { put(it) } })
         put("tomorrowWords", JSONArray().apply { c.tomorrowWords.forEach { put(it) } })
@@ -93,7 +95,9 @@ object ConfigJson {
         } ?: base.weekdayPriority,
         includeToday = o.bool("includeToday", base.includeToday),
         maxDaysAhead = o.int("maxDaysAhead", base.maxDaysAhead),
+        releaseDaysAhead = o.int("releaseDaysAhead", base.releaseDaysAhead),
         fridayAfternoonOnly = o.bool("fridayAfternoonOnly", base.fridayAfternoonOnly),
+        useNextReleaseDate = o.bool("useNextReleaseDate", base.useNextReleaseDate),
         datePatterns = o.stringList("datePatterns") ?: base.datePatterns,
         todayWords = o.stringList("todayWords") ?: base.todayWords,
         tomorrowWords = o.stringList("tomorrowWords") ?: base.tomorrowWords,

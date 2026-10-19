@@ -43,7 +43,7 @@ import java.time.LocalDateTime
 /**
  * 主界面：
  *  · 权限一览 + 一键跳转（无障碍 / 精确闹钟 / 通知 / 悬浮窗 / 电池 / MIUI 自启动）
- *  · 每日触发时间、开关、本次邀请码
+ *  · 每日触发时间、开关、本次同伴码
  *  · 立即试跑 / 停止
  *  · 调试工具：抓取当前界面节点树、分享、导出/重载配置、日期预览
  *  · 实时日志
@@ -90,7 +90,7 @@ class MainActivity : AppCompatActivity() {
     // ───────────────────────── UI 绑定 ─────────────────────────
 
     private fun bindUi() {
-        // 邀请码
+        // 同伴码
         b.etInviteCode.setText(prefs.inviteCode)
         b.etInviteCode.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, a: Int, bb: Int, c: Int) = Unit
@@ -350,11 +350,11 @@ class MainActivity : AppCompatActivity() {
         }
         val code = b.etInviteCode.text.toString().trim()
         if (code.isNotEmpty() && code.length != 5) {
-            toast("邀请码需要 5 位数字")
+            toast("同伴码需要 5 位数字")
             return
         }
         if (code.length == 5) prefs.inviteCode = code
-        Logs.i(TAG, "手动试跑（邀请码=${if (code.length == 5) "已填" else "未填，流程中会弹窗要"}）")
+        Logs.i(TAG, "手动试跑（同伴码=${if (code.length == 5) "已填" else "未填，流程中会弹窗要"}）")
         toast("开始试跑：请保持屏幕常亮、不要操作手机")
         GrabForegroundService.startFire(this)
     }
@@ -442,7 +442,7 @@ class MainActivity : AppCompatActivity() {
                         "· timeSlots —— 时段节点的正则\n" +
                         "· btnBookNow / noticeItem / btnSubmitOrder —— 我要预约、通报信息、提交订单\n" +
                         "· dateCfg.weekdayPriority —— 日期优先级（默认 FRI→SAT→SUN）\n" +
-                        "· codeInput / btnConfirm —— 邀请码输入框与确定按钮",
+                        "· codeInput / btnConfirm —— 同伴码输入框与确定按钮",
                 )
             }.onFailure { toast("导出失败：${it.message}") }
         }

@@ -366,7 +366,7 @@
                 android:id="@+id/cbRememberCode"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="记住邀请码（若每次相同再勾选）"
+                android:text="记住同伴码（同一个同伴码不变时才勾）"
                 android:textColor="@color/text_secondary"
                 android:textSize="13sp" />
 

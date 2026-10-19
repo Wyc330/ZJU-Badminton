@@ -19,7 +19,7 @@ import com.zju.courtgrab.util.Perms
  *   1. 先把「明天这一次」排上（即使后面失败也不会断掉每天循环）
  *   2. 检查无障碍服务（没开会直接通知并终止）
  *   3. 唤醒屏幕 + 起前台服务保活
- *   4. 有邀请码 → 直接开抢；没有 → 通知/全屏页让你输入（最多等 inviteCodeWaitMs）
+ *   4. 有同伴码 → 直接开抢；没有 → 通知/全屏页让你输入（最多等 inviteCodeWaitMs）
  *
  * 说明：精确闹钟触发的 BroadcastReceiver 允许启动前台服务，这是 Android 12+ 上
  * 从后台把流程拉起来的合法路径。
@@ -56,11 +56,11 @@ class BookingAlarmReceiver : BroadcastReceiver() {
 
         // 4. 有码直接开抢；没码让用户输入
         if (code.length == 5) {
-            Logs.i(TAG, "已有 5 位邀请码，直接开抢")
+            Logs.i(TAG, "已有 5 位同伴码，直接开抢")
             runCatching { GrabForegroundService.startFire(context) }
                 .onFailure { Logs.e(TAG, "启动抢场地流程失败", it) }
         } else {
-            Logs.i(TAG, "没有本次邀请码，弹出输入页")
+            Logs.i(TAG, "没有本次同伴码，弹出输入页")
             Notify.showCodeRequest(context)
             runCatching {
                 context.startActivity(

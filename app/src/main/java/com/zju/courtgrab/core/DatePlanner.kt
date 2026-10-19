@@ -19,8 +19,16 @@ data class DatePlanConfig(
     val includeToday: Boolean = true,
     /** 只考虑未来 N 天内；0 = 不限制（交给界面里实际存在哪些日期） */
     val maxDaysAhead: Int = 0,
-    /** 选中周五时是否只挑下午时段 */
-    val fridayAfternoonOnly: Boolean = true,
+    /** 「待开票最近一天」策略下：9:00 放号时新开的是第几天（实测 = 2，即后天） */
+    val releaseDaysAhead: Int = 2,
+    /**
+     * 待开票的最近一天：下一次 09:00 放号时新开的那一天（默认策略）。
+     * 例：09:00 前触发 → 今天+2；09:00 后触发 → 明天+2。
+     * 关掉后才会退回「窗口内按星期优先级挑」的旧逻辑。
+     */
+    val useNextReleaseDate: Boolean = true,
+    /** 选中周五时是否只挑下午时段（默认关：用户要的是"待开票最近一天"，不限制星期） */
+    val fridayAfternoonOnly: Boolean = false,
     /** 日期格文案的正则，必须用「2 组」或「3 组」捕获分别表示 月/日 或 年/月/日 */
     val datePatterns: List<String> = listOf(
         "(\\d{4})\\s*[-/\\.年]\\s*(\\d{1,2})\\s*[-/\\.月]\\s*(\\d{1,2})",
@@ -158,6 +166,37 @@ object DatePlanner {
     fun parseDisplayed(text: String?, cfg: DatePlanConfig, now: LocalDateTime = LocalDateTime.now()): LocalDate? {
         if (text.isNullOrBlank()) return null
         return parseCell(text, now, cfg)
+    }
+
+    /**
+     * 待开票的最近一天：下一次 release 时刻（默认 09:00）新开的那一天。
+     *
+     * 每天 09:00 放「后天」的号，所以：
+     *   · 09:00 之前 → 今天 + daysAhead（= 今天+2）
+     *   · 09:00 之后 → 明天 + daysAhead（= 今天+3，即明天 9 点放的那一天）
+     */
+    fun nextReleaseTarget(
+        now: LocalDateTime,
+        releaseHour: Int,
+        releaseMinute: Int,
+        daysAhead: Int,
+    ): LocalDate {
+        val today = now.toLocalDate()
+        val todayRelease = today.atTime(releaseHour, releaseMinute)
+        val releaseDay = if (now.isBefore(todayRelease)) today else today.plusDays(1)
+        return releaseDay.plusDays(daysAhead.coerceAtLeast(1).toLong())
+    }
+
+    /** 统一的目标日期：默认「待开票的最近一天」，否则旧的窗口+星期优先级 */
+    fun resolveTargetDate(
+        now: LocalDateTime,
+        cfg: DatePlanConfig,
+        releaseHour: Int,
+        releaseMinute: Int,
+    ): LocalDate? = if (cfg.useNextReleaseDate) {
+        nextReleaseTarget(now, releaseHour, releaseMinute, cfg.releaseDaysAhead)
+    } else {
+        windowCandidates(now, cfg, cfg.maxDaysAhead, requirePreferred = true, preferFresh = true).firstOrNull()
     }
 
     /**

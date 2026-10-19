@@ -44,10 +44,7 @@ object DirectBookingFlow {
         }
 
         val now = LocalDateTime.now()
-        val date = DatePlanner.windowCandidates(
-            now, cfg.dateCfg, cfg.dateCfg.maxDaysAhead,
-            cfg.requirePreferredWeekday, cfg.preferFreshDates,
-        ).firstOrNull()
+        val date = DatePlanner.resolveTargetDate(now, cfg.dateCfg, cfg.releaseHour, cfg.releaseMinute)
         if (date == null) {
             Logs.w(TAG, "预约窗口内没有目标日期，回退界面流程")
             return false

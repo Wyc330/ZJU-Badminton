@@ -110,4 +110,22 @@ class DatePlannerTest {
         val plan = DatePlanner.plan(cells, monday, DatePlanConfig(maxDaysAhead = 2))
         assertEquals(LocalDate.of(2026, 10, 20), plan.chosen!!.date)
     }
+
+    @Test
+    fun `next release target is today plus two before 9am`() {
+        val before = LocalDateTime.of(2026, 10, 19, 8, 59, 45)
+        assertEquals(LocalDate.of(2026, 10, 21), DatePlanner.nextReleaseTarget(before, 9, 0, 2))
+    }
+
+    @Test
+    fun `next release target rolls to tomorrow plus two after 9am`() {
+        val after = LocalDateTime.of(2026, 10, 19, 9, 5, 0)
+        assertEquals(LocalDate.of(2026, 10, 22), DatePlanner.nextReleaseTarget(after, 9, 0, 2))
+    }
+
+    @Test
+    fun `resolve target date defaults to next release mode`() {
+        val now = LocalDateTime.of(2026, 10, 19, 8, 0, 0)
+        assertEquals(LocalDate.of(2026, 10, 21), DatePlanner.resolveTargetDate(now, DatePlanConfig(), 9, 0))
+    }
 }

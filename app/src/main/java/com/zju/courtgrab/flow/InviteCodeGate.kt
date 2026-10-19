@@ -9,9 +9,9 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * 「本次邀请码」闸门。
+ * 「本次同伴码」闸门。
  *
- * 你说邀请码每次都不一样，所以流程走到「填邀请码」这一步时：
+ * 你说同伴码每次都不一样，所以流程走到「填同伴码」这一步时：
  *   · 如果主界面 / 到点弹窗里已经填过 → 直接用
  *   · 否则弹通知 + 全屏输入页，流程原地挂起等你输入（最长 inviteCodeWaitMs）
  *
@@ -34,7 +34,7 @@ object InviteCodeGate {
         val deferred = CompletableDeferred<String?>()
         waiter = deferred
         isWaiting = true
-        Logs.i(TAG, "等待用户输入邀请码（最长 ${timeoutMs / 1000}s）")
+        Logs.i(TAG, "等待用户输入同伴码（最长 ${timeoutMs / 1000}s）")
 
         Notify.showCodeRequest(app)
         runCatching {
@@ -49,9 +49,9 @@ object InviteCodeGate {
         return try {
             val code = withTimeoutOrNull(timeoutMs) { deferred.await() }
             if (code.isNullOrBlank()) {
-                Logs.w(TAG, "没有拿到邀请码（超时或用户跳过）")
+                Logs.w(TAG, "没有拿到同伴码（超时或用户跳过）")
             } else {
-                Logs.i(TAG, "已拿到邀请码（${code.length} 位）")
+                Logs.i(TAG, "已拿到同伴码（${code.length} 位）")
             }
             code
         } finally {

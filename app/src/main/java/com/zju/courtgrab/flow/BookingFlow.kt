@@ -144,10 +144,9 @@ class BookingFlow(
         // 预热 2：放号前先试着把日期切到目标（有些时段窗口提前就允许切，
         // 这样 09:00:00 之后只剩「刷新 → 点格子」两件事）
         if (cfg.turboMode) {
-            val warmDate = DatePlanner.windowCandidates(
-                LocalDateTime.now(), cfg.dateCfg, cfg.dateCfg.maxDaysAhead,
-                cfg.requirePreferredWeekday, cfg.preferFreshDates,
-            ).firstOrNull()
+            val warmDate = DatePlanner.resolveTargetDate(
+                LocalDateTime.now(), cfg.dateCfg, cfg.releaseHour, cfg.releaseMinute,
+            )
             if (warmDate != null) {
                 step("⑫⅜ 预热（提前切日期）") {
                     val reached = navigateToDate(warmDate)
@@ -162,17 +161,10 @@ class BookingFlow(
         step("⑫½ 等到 ${cfg.releaseHour}:${"%02d".format(cfg.releaseMinute)} 放号") { waitForRelease() }
 
         val now = LocalDateTime.now()
-        val candidates = DatePlanner.windowCandidates(
-            now, cfg.dateCfg, cfg.dateCfg.maxDaysAhead, cfg.requirePreferredWeekday, cfg.preferFreshDates,
-        )
-        if (candidates.isEmpty()) {
-            val want = cfg.dateCfg.weekdayPriority.joinToString("/") { DatePlanner.weekdayCn(it) }
-            throw FlowException(
-                "选择日期",
-                "预约窗口（今天+${cfg.dateCfg.maxDaysAhead}天）里没有 $want，本次不抢",
-            )
-        }
-        Log("日期候选：${candidates.joinToString(" ") { "$it(${DatePlanner.weekdayCn(it.dayOfWeek)})" }}")
+        val target = DatePlanner.resolveTargetDate(now, cfg.dateCfg, cfg.releaseHour, cfg.releaseMinute)
+            ?: throw FlowException("选择日期", "算不出目标日期（检查 dateCfg 配置）")
+        val candidates = listOf(target)
+        Log("目标日期（待开票的最近一天）：$target（${DatePlanner.weekdayCn(target.dayOfWeek)}）")
         Notify("开始抢 ${candidates.first()} 的场")
 
         var lastError: FlowException? = null

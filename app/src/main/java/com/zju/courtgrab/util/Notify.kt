@@ -19,7 +19,7 @@ import com.zju.courtgrab.ui.CodeRequestActivity
 /**
  * 通知统一入口。
  *  - 流程前台通知（保活）
- *  - 到点「输入邀请码」全屏通知
+ *  - 到点「输入同伴码」全屏通知
  *  - 结果通知
  */
 object Notify {
@@ -46,7 +46,7 @@ object Notify {
             )
             nm.createNotificationChannel(
                 NotificationChannel(CH_ALARM, "到点提醒", NotificationManager.IMPORTANCE_HIGH).apply {
-                    description = "到点提醒你输入邀请码"
+                    description = "到点提醒你输入同伴码"
                     enableVibration(true)
                     setBypassDnd(true)
                 }
@@ -112,17 +112,17 @@ object Notify {
         }.onFailure { Logs.w(TAG, "showFlowRunning: ${it.message}") }
     }
 
-    /** 到点提醒：全屏 Intent（用户点了直接进输入邀请码页），同时带一个普通的点按入口 */
+    /** 到点提醒：全屏 Intent（用户点了直接进输入同伴码页），同时带一个普通的点按入口 */
     fun showCodeRequest(context: Context) {
         ensureChannels(context)
         if (!canNotify(context)) {
-            Logs.w(TAG, "通知权限未开，无法弹「输入邀请码」通知")
+            Logs.w(TAG, "通知权限未开，无法弹「输入同伴码」通知")
             return
         }
         val builder = NotificationCompat.Builder(context, CH_ALARM)
             .setSmallIcon(R.drawable.ic_launcher)
-            .setContentTitle("到点了：请输入本次 5 位邀请码")
-            .setContentText("点这里输入邀请码，App 会自动继续预约流程")
+            .setContentTitle("到点了：请输入本次 5 位同伴码")
+            .setContentText("点这里输入同伴码，App 会自动继续预约流程")
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setAutoCancel(true)
