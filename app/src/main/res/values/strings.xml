@@ -22,7 +22,7 @@
     <string name="btn_open">去开启</string>
     <string name="btn_refresh">刷新</string>
 
-    <string name="hint_invite_code">本次同伴码（5 位数字，留空则到点弹窗问你）</string>
+    <string name="hint_invite_code">同伴码（一次性，由同伴在「我的同伴码」生成后发你）</string>
     <string name="label_alarm_time">每日触发时间</string>
     <string name="label_switch_enabled">启用每日自动抢场地</string>
     <string name="btn_start_now">立即试跑一次</string>
@@ -35,7 +35,7 @@
     <string name="btn_clear_log">清空日志</string>
     <string name="btn_test_date">计算今天的目标日期</string>
 
-    <string name="code_title">输入本次 5 位同伴码</string>
+    <string name="code_title">输入同伴码（一次性，用后作废）</string>
     <string name="code_hint">同伴码</string>
     <string name="code_ok">确定并继续</string>
     <string name="code_skip">跳过（流程会因为缺码停下）</string>

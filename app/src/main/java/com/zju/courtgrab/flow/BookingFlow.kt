@@ -964,7 +964,6 @@ class BookingFlow(
         }
         delay(120)
         prefs.lastCode = code
-        if (prefs.rememberCode) prefs.inviteCode = code
 
         // 确定（坐标缓存优先）
         tapCached("confirm", cfg.btnConfirm, "点击确定")

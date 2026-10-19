@@ -374,7 +374,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
-                android:text="目标日期优先级：周五下午 → 周六 → 周日（配置里可改）"
+                android:text="目标日期：待开票的最近一天（每天 9:00 放哪天就抢哪天）"
                 android:textColor="@color/text_secondary"
                 android:textSize="12sp" />
 

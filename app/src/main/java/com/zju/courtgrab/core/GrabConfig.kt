@@ -300,8 +300,13 @@ data class GrabConfig(
         appendLine("venueBadminton       = ${venueBadminton.joinToString { it.describe() }}")
         appendLine("dateDisplay          = ${dateDisplay.describe()}")
         appendLine("放号时间             = ${releaseHour}:%02d:%02d".format(releaseMinute, releaseSecond) + "，等到点=${waitForRelease}，优先后天=${preferFreshDates}")
-        appendLine("dateCfg              = 优先级=${dateCfg.weekdayPriority.joinToString { DatePlanner.weekdayCn(it) }}，" +
-            "窗口=今天+${dateCfg.maxDaysAhead}天，周五只看下午=${dateCfg.fridayAfternoonOnly}")
+        appendLine(
+            if (dateCfg.useNextReleaseDate)
+                "dateCfg              = 待开票的最近一天（9:00 前=今天+${dateCfg.releaseDaysAhead}，9:00 后=明天+${dateCfg.releaseDaysAhead}）"
+            else
+                "dateCfg              = 优先级=${dateCfg.weekdayPriority.joinToString { DatePlanner.weekdayCn(it) }}，" +
+                    "窗口=今天+${dateCfg.maxDaysAhead}天，周五只看下午=${dateCfg.fridayAfternoonOnly}",
+        )
         appendLine("slotRowLabel         = ${slotRowLabel.describe()}")
         appendLine("slotColumnHeader     = ${slotColumnHeader.describe()}")
         appendLine("时段格识别           = 格子节点=${useCellNodes}（±${cellMinWidth}x${cellMinHeight}以上），滚动扫描 竖${maxVerticalScrollPasses}/横${maxHorizontalScrollPasses}")

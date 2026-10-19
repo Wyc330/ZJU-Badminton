@@ -106,8 +106,10 @@ class MainActivity : AppCompatActivity() {
             }
         })
 
-        b.cbRememberCode.isChecked = prefs.rememberCode
-        b.cbRememberCode.setOnCheckedChangeListener { _, checked -> prefs.rememberCode = checked }
+        // 同伴码是一次性的（同伴在「我的同伴码」生成，用后作废），记住只会用错码，所以强制关闭并隐藏
+        prefs.rememberCode = false
+        b.cbRememberCode.isChecked = false
+        b.cbRememberCode.visibility = android.view.View.GONE
 
         b.cbDryRun.isChecked = prefs.dryRun
         b.cbDryRun.setOnCheckedChangeListener { _, checked -> prefs.dryRun = checked }

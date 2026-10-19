@@ -31,6 +31,8 @@ object DirectBookingFlow {
     private val NOT_OPEN_HINTS = listOf(
         "未开放", "未开始", "不在开放", "未到", "时间未到", "暂未", "未开启", "不可预约时间",
     )
+    /** 同伴码相关拒绝：一次性码已失效/填错，重试也没用，必须让用户找同伴重新要码 */
+    private val BUDDY_CODE_HINTS = listOf("同伴码", "同伴信息", "同伴", "buddy")
     private val FULL_HINTS = listOf(
         "已满", "约满", "无可用", "已被预约", "已订满", "已被约", "无可预约", "库存不足",
     )
@@ -161,6 +163,10 @@ object DirectBookingFlow {
                 val msg = e.message ?: ""
                 lastNote = "服务端拒绝（code=${e.code}）：$msg"
                 when {
+                    msg.containsAny(BUDDY_CODE_HINTS) -> {
+                        Logs.w(TAG, "同伴码校验失败（$msg）：同伴码是一次性的，请让同伴重新生成后填入，本次直连停止")
+                        return false
+                    }
                     msg.containsAny(FULL_HINTS) -> {
                         spaceIndex++
                         Logs.i(TAG, "第 $attempt 轮：该场地已满，换下一片（${spaceIndex % spaces.size + 1}/${spaces.size}）")
