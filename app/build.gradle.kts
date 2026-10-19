@@ -12,8 +12,8 @@ android {
         minSdk = 26
         targetSdk = 34
         // 0.9.0alphaX 系列：versionCode 跟 alpha 序号走（alpha1 → 1）
-        versionCode = 6
-        versionName = "0.9.0alpha6"
+        versionCode = 7
+        versionName = "0.9.0alpha7"
     }
 
     buildTypes {

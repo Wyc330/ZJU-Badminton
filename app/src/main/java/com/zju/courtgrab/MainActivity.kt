@@ -10,6 +10,7 @@ import android.text.TextWatcher
 import android.view.View
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
+import com.zju.courtgrab.direct.VenueLoginActivity
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.NumberPicker
@@ -79,6 +80,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        b.cbDirectMode.isChecked = prefs.directMode
+        renderDirectStatus()
         refreshStatus()
         refreshNextRun()
         refreshConfigPath()
@@ -111,6 +114,18 @@ class MainActivity : AppCompatActivity() {
 
         // 「想预约的时间段」下拉框（任意场地，按时段优先）
         setupSlotTimeSpinner()
+
+        // 直连下单模式（极速；失败自动回退界面流程）
+        b.cbDirectMode.isChecked = prefs.directMode
+        b.cbDirectMode.setOnCheckedChangeListener { _, checked ->
+            prefs.directMode = checked
+            Logs.i(TAG, "直连下单模式 = $checked")
+            renderDirectStatus()
+        }
+        b.btnVenueLogin.setOnClickListener {
+            startActivity(android.content.Intent(this, VenueLoginActivity::class.java))
+        }
+        renderDirectStatus()
 
         b.swEnabled.isChecked = prefs.enabled
         b.swEnabled.setOnCheckedChangeListener { _, checked ->
@@ -149,6 +164,19 @@ class MainActivity : AppCompatActivity() {
             prefs.tapCacheJson = ""
             toast("点击缓存已清除，下次运行会重新学习坐标")
             Logs.i(TAG, "点击缓存已清除")
+        }
+    }
+
+    /** 显示直连模式登录态（脱敏） */
+    private fun renderDirectStatus() {
+        val token = prefs.venueToken
+        val whenText = if (prefs.venueTokenAt > 0) {
+            java.text.SimpleDateFormat("MM-dd HH:mm", java.util.Locale.CHINA)
+                .format(java.util.Date(prefs.venueTokenAt))
+        } else ""
+        b.tvDirectStatus.text = when {
+            token.isBlank() -> "直连：未登录场馆系统（点下方按钮登录一次）"
+            else -> "直连：已登录（${token.take(6)}…${token.takeLast(4)}，$whenText）"
         }
     }
 

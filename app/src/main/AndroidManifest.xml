@@ -43,6 +43,13 @@
             </intent-filter>
         </activity>
 
+        <!-- 内置场馆系统登录页：仅用于获取直连下单所需的登录态 -->
+        <activity
+            android:name=".direct.VenueLoginActivity"
+            android:exported="false"
+            android:label="登录场馆系统"
+            android:windowSoftInputMode="adjustResize" />
+
         <!-- ========== 到点后要求输入「本次邀请码」的全屏页 ========== -->
         <activity
             android:name=".ui.CodeRequestActivity"

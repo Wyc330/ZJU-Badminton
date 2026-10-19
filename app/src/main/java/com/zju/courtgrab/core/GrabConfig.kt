@@ -189,6 +189,10 @@ data class GrabConfig(
      * 留空 = 取中间偏后的空闲时段。主界面下拉框里可以选，无需改这里。
      */
     val preferredSlotStart: String = "",
+    /** 直连下单时匹配的场馆名称（接口里按名字找 id） */
+    val directVenueName: String = "风雨操场",
+    /** 直连下单时直接指定场馆 id（0=自动按名称匹配） */
+    val directVenueSiteId: Long = 0L,
     /**
      * 极速模式：提前把「已阅读并同意」勾好；放号瞬间只做
      * 刷新 → 切日期 → 点格子 → 我要预约 这四件事。

@@ -403,6 +403,29 @@
                 android:textSize="13sp" />
 
             <CheckBox
+                android:id="@+id/cbDirectMode"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="直连下单（极速：09:00:00 直接调接口，失败自动回退界面流程）"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/tvDirectStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="直连：未登录场馆系统"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp" />
+
+            <Button
+                android:id="@+id/btnVenueLogin"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="登录场馆系统（只需一次，用于直连下单）" />
+
+            <CheckBox
                 android:id="@+id/cbDryRun"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

@@ -8,6 +8,7 @@ import com.zju.courtgrab.a11y.ScreenCap
 import com.zju.courtgrab.a11y.VenueAccessibilityService
 import com.zju.courtgrab.core.ConfigRepo
 import com.zju.courtgrab.core.DatePlanner
+import com.zju.courtgrab.core.FlowBus
 import com.zju.courtgrab.core.GrabConfig
 import com.zju.courtgrab.core.Locator
 import com.zju.courtgrab.core.LocatorMatcher
@@ -25,6 +26,7 @@ import com.zju.courtgrab.core.SlotPick
 import com.zju.courtgrab.core.SlotRowSamples
 import com.zju.courtgrab.core.SlotState
 import com.zju.courtgrab.core.TapCache
+import com.zju.courtgrab.direct.DirectBookingFlow
 import com.zju.courtgrab.util.BgLaunch
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
@@ -100,6 +102,19 @@ class BookingFlow(
         cfg = ConfigRepo.load(ctx)
         Logs.i(TAG, "配置摘要:\n${cfg.summary()}")
         Logs.i(TAG, "触发来源=$trigger，时间=${Logs.fullTime()}")
+
+        // 直连模式：能直连就直连（失败自动回退下面的界面流程）
+        if (prefs.directMode) {
+            var directOk = false
+            step("⚡ 直连下单（极速模式）") {
+                directOk = DirectBookingFlow.execute(prefs, cfg)
+                if (!directOk) Log("直连未成功，回退界面流程")
+            }
+            if (directOk) {
+                FlowBus.done(true, "直连下单成功（${Logs.fullTime()}）")
+                return
+            }
+        }
 
         step("① 启动目标 App") { launchTarget() }
         step("② 关闭弹窗") { dismissPopups() }

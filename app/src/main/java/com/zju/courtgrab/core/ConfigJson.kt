@@ -221,6 +221,8 @@ object ConfigJson {
         put("slotVerifyByRecapture", cfg.slotVerifyByRecapture)
         put("preferredSlotStart", cfg.preferredSlotStart)
         put("turboMode", cfg.turboMode)
+        put("directVenueName", cfg.directVenueName)
+        put("directVenueSiteId", cfg.directVenueSiteId)
         put("agreeCheckbox", locatorsToJson(cfg.agreeCheckbox))
         put("btnBookNow", locatorsToJson(cfg.btnBookNow))
         put("companionPageReady", locatorsToJson(cfg.companionPageReady))
@@ -297,6 +299,8 @@ object ConfigJson {
         slotVerifyByRecapture = json.bool("slotVerifyByRecapture", base.slotVerifyByRecapture),
         preferredSlotStart = json.str("preferredSlotStart", base.preferredSlotStart),
         turboMode = json.bool("turboMode", base.turboMode),
+        directVenueName = json.str("directVenueName", base.directVenueName),
+        directVenueSiteId = json.optLong("directVenueSiteId", base.directVenueSiteId),
         agreeCheckbox = json.locators("agreeCheckbox", base.agreeCheckbox),
         btnBookNow = json.locators("btnBookNow", base.btnBookNow),
         companionPageReady = json.locators("companionPageReady", base.companionPageReady),

@@ -61,6 +61,25 @@ class Prefs private constructor(context: Context) {
         get() = sp.getString("tap_cache_json", "").orEmpty()
         set(v) = sp.edit().putString("tap_cache_json", v).apply()
 
+    /** 直连下单模式（在 App 内登录场馆系统后，09:00:00 直接调接口，失败自动回退界面流程） */
+    var directMode: Boolean
+        get() = sp.getBoolean("direct_mode", false)
+        set(v) = sp.edit().putBoolean("direct_mode", v).apply()
+
+    /** 场馆系统登录态（H5 的 access_token），由内置登录页从同源 localStorage 读取 */
+    var venueToken: String
+        get() = sp.getString("venue_token", "").orEmpty()
+        set(v) = sp.edit().putString("venue_token", v).apply()
+
+    var venueTokenAt: Long
+        get() = sp.getLong("venue_token_at", 0L)
+        set(v) = sp.edit().putLong("venue_token_at", v).apply()
+
+    /** 系统 WebView 的 UA（直连请求要完全一致，避免出现异常客户端指纹） */
+    var webviewUa: String
+        get() = sp.getString("webview_ua", "").orEmpty()
+        set(v) = sp.edit().putString("webview_ua", v).apply()
+
     /** 演练模式：走到「提交订单」前就停，不真正下单（调试期强烈建议开着） */
     var dryRun: Boolean
         get() = sp.getBoolean("dry_run", true)
