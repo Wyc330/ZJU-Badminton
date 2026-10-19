@@ -24,6 +24,7 @@ import com.zju.courtgrab.core.SlotGrid
 import com.zju.courtgrab.core.SlotPick
 import com.zju.courtgrab.core.SlotRowSamples
 import com.zju.courtgrab.core.SlotState
+import com.zju.courtgrab.core.TapCache
 import com.zju.courtgrab.util.BgLaunch
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
@@ -78,6 +79,20 @@ class BookingFlow(
     private val screenH: Int = svc.resources.displayMetrics.heightPixels
     private val screenW: Int = svc.resources.displayMetrics.widthPixels
     private var lastShotAt = 0L
+    /** 学习到的点击坐标（第一次跑到就记住，下次直接点） */
+    private val tapCache: MutableMap<String, Pair<Int, Int>> = TapCache.load(prefs)
+
+    private fun rememberPoint(key: String, x: Int, y: Int) {
+        val old = tapCache[key]
+        if (old == null || old.first != x || old.second != y) {
+            tapCache[key] = x to y
+            TapCache.save(prefs, tapCache)
+            Log("  学习坐标 $key=($x, $y)")
+        }
+    }
+
+    /** 有缓存就按坐标快速点击；没有就走正常定位并学习 */
+    private fun cachedPoint(key: String): Pair<Int, Int>? = tapCache[key]
 
     // ─────────────────────────── 主流程 ───────────────────────────
 
@@ -164,7 +179,7 @@ class BookingFlow(
 
                 step("⑮ 勾选同意") { ensureAgreeChecked() }
                 step("⑯ 点击我要预约") {
-                    clickSelect("点击我要预约", cfg.btnBookNow)
+                    tapCached("book", cfg.btnBookNow, "点击我要预约", expectText = "同伴信息")
                     delay(cfg.afterNavDelayMs)
                     dismissPopups()
                 }
@@ -177,7 +192,7 @@ class BookingFlow(
                     return
                 }
                 step("⑲ 提交订单") {
-                    clickSelect("提交订单", cfg.btnSubmitOrder)
+                    tapCached("submit", cfg.btnSubmitOrder, "提交订单")
                     delay(cfg.afterNavDelayMs)
                 }
                 step("⑳ 确认结果") { verifyResult() }
@@ -321,6 +336,39 @@ class BookingFlow(
         )
     }
 
+    /**
+     * 热路径点击：有学习坐标就直接点（跳过节点树遍历）；没有就正常定位、学习并点击。
+     * 点完可以用 [expectText] 快速确认页面真的变了（findAccessibilityNodeInfosByText，10~30ms）。
+     */
+    private suspend fun tapCached(
+        key: String,
+        locs: List<Locator>,
+        what: String,
+        expectText: String? = null,
+        expectTimeoutMs: Long = 2500,
+    ): Boolean {
+        cachedPoint(key)?.let { p ->
+            Log("  $what：用学习坐标 (${p.first}, ${p.second})")
+            ops.tapFast(p.first.toFloat(), p.second.toFloat())
+            if (expectText == null) {
+                delay(100)
+                return true
+            }
+            if (ops.waitTextFast(expectText, expectTimeoutMs) != null) return true
+            Logs.w(TAG, "  $what：学习坐标没生效，回退到正常定位")
+        }
+        val node = ops.waitFor(locs, cfg.stepTimeoutMs, cfg.pollIntervalMs)
+            ?: throw FlowException(what, "没找到控件；界面文字=${ops.visibleTextDigest()}")
+        val c = node.snap.bounds
+        rememberPoint(key, c.centerX, c.centerY)
+        Log("  $what：命中 ${node.snap.summary()}")
+        ops.tapFast(c.centerX.toFloat(), c.centerY.toFloat())
+        if (expectText != null && ops.waitTextFast(expectText, expectTimeoutMs) == null) {
+            throw FlowException(what, "点击后没出现「$expectText」；界面文字=${ops.visibleTextDigest()}")
+        }
+        return true
+    }
+
     /** 选择型点击：点一下就行（校区/场馆/场地/按钮），不要求界面文字变化 */
     private suspend fun clickSelect(name: String, locs: List<Locator>): HNode {
         ensureTargetForeground(name)
@@ -448,6 +496,11 @@ class BookingFlow(
      * 找不到再按比例做坐标点击兜底。
      */
     private suspend fun tapDateArrow(forward: Boolean, attempt: Int): Boolean {
+        val cacheKey = if (forward) "date_next" else "date_prev"
+        cachedPoint(cacheKey)?.let { p ->
+            ops.tapFast(p.first.toFloat(), p.second.toFloat())
+            return true
+        }
         val anchor = ops.waitFor(listOf(cfg.dateDisplay), 1200, 100) ?: return false
         val anchorBox = anchor.snap.bounds.toBox()
         if (attempt == 0) {
@@ -455,7 +508,8 @@ class BookingFlow(
             val neighbor = SlotGridGeometry.findNeighbor(anchorBox, onBand, forward = forward, index = 0)
             if (neighbor != null) {
                 Log("  日期箭头（${if (forward) "下一天" else "上一天"}）坐标 (${neighbor.centerX}, ${neighbor.centerY})")
-                return ops.tap(neighbor.centerX.toFloat(), neighbor.centerY.toFloat())
+                rememberPoint(cacheKey, neighbor.centerX, neighbor.centerY)
+                return ops.tapFast(neighbor.centerX.toFloat(), neighbor.centerY.toFloat())
             }
         }
         val ratio = when (attempt) {
@@ -538,11 +592,18 @@ class BookingFlow(
             return false
         }
         val box = anchor.snap.bounds.toBox()
+        cachedPoint("refresh")?.let { p ->
+            Log("  刷新：用学习坐标 (${p.first}, ${p.second})")
+            ops.tapFast(p.first.toFloat(), p.second.toFloat())
+            delay(150)
+            return true
+        }
         val refresh = SlotGridGeometry.findNeighbor(box, clickableBoxesOnScreen(), forward = true, index = 1)
         if (refresh != null) {
             Log("  点刷新按钮坐标 (${refresh.centerX}, ${refresh.centerY})")
-            ops.tap(refresh.centerX.toFloat(), refresh.centerY.toFloat())
-            delay(700)
+            rememberPoint("refresh", refresh.centerX, refresh.centerY)
+            ops.tapFast(refresh.centerX.toFloat(), refresh.centerY.toFloat())
+            delay(150)
             return true
         }
         val x = box.right + (box.height * cfg.refreshTapRatio).toInt().coerceAtLeast(24)
@@ -770,6 +831,12 @@ class BookingFlow(
     // ─────────────────────────── 勾选 / 下单 / 同伴 ───────────────────────────
 
     private suspend fun ensureAgreeChecked() {
+        cachedPoint("agree")?.let { p ->
+            Log("  同意勾选：用学习坐标 (${p.first}, ${p.second})")
+            ops.tapFast(p.first.toFloat(), p.second.toFloat())
+            delay(80)
+            return
+        }
         val bottomY = (screenH * 0.55f).toInt()
         val checkables = ops.collect().filter {
             it.snap.checkable && it.snap.visible && it.snap.bounds.centerY >= bottomY
@@ -781,7 +848,8 @@ class BookingFlow(
                 Log("  已经勾选，跳过")
                 return
             }
-            ops.click(target, 300)
+            rememberPoint("agree", target.snap.bounds.centerX, target.snap.bounds.centerY)
+            ops.tapFast(target.snap.bounds.centerX.toFloat(), target.snap.bounds.centerY.toFloat())
             delay(250)
             val after = ops.collect().firstOrNull {
                 it.snap.checkable && it.snap.bounds.centerY >= bottomY
@@ -828,6 +896,12 @@ class BookingFlow(
             ops.waitFor(listOf(Locator(textContains = cfg.companionName)), 2500, 150)
         } else null
 
+        cachedPoint("companion")?.let { p ->
+            Log("  同伴勾选：用学习坐标 (${p.first}, ${p.second})")
+            ops.tapFast(p.first.toFloat(), p.second.toFloat())
+            delay(120)
+            return fillCompanionCode(code)
+        }
         val checkbox = ops.findAll(cfg.companionCandidates).firstOrNull()
         val target = explicit ?: checkbox
         if (target == null) {
@@ -844,28 +918,50 @@ class BookingFlow(
                 return
             }
             Log("  勾选同伴：${target.snap.summary()}")
-            ops.click(target, cfg.afterClickDelayMs)
+            rememberPoint("companion", target.snap.bounds.centerX, target.snap.bounds.centerY)
+            ops.tapFast(target.snap.bounds.centerX.toFloat(), target.snap.bounds.centerY.toFloat())
         }
-        delay(500)
+        delay(400)
+        fillCompanionCode(code)
+    }
 
-        // 2) 同伴码弹窗
-        val input = ops.waitFor(cfg.codeInput, cfg.stepTimeoutMs, cfg.pollIntervalMs)
-            ?: throw FlowException(
-                "填写同伴码",
-                "点了同伴后没出现输入框；界面文字=${ops.visibleTextDigest()}",
-            )
-        Log("  输入框：${input.snap.summary()}")
-        ops.click(input, 200)
-        delay(150)
-        val ok = ops.setText(input, code)
-        delay(300)
-        Log("  写入同伴码：${if (ok) "成功" else "ACTION_SET_TEXT 失败"}")
+    /**
+     * 填 5 位同伴码：优先「学习坐标点一下 → 直接往焦点输入框写文本」，
+     * 完全不遍历节点树；失败再回退到正常定位。
+     */
+    private suspend fun fillCompanionCode(code: String) {
+        var ok = false
+        val cachedInput = cachedPoint("code_input")
+        if (cachedInput != null) {
+            ops.tapFast(cachedInput.first.toFloat(), cachedInput.second.toFloat())
+            delay(80)
+            val focused = ops.focusedEditable()
+            if (focused != null) {
+                ok = ops.setText(focused, code)
+                Log("  填码（学习坐标 + 焦点输入框）：${if (ok) "成功" else "失败"}")
+            }
+        }
+        if (!ok) {
+            val input = ops.waitFor(cfg.codeInput, cfg.stepTimeoutMs, cfg.pollIntervalMs)
+                ?: throw FlowException(
+                    "填写同伴码",
+                    "点了同伴后没出现输入框；界面文字=${ops.visibleTextDigest()}",
+                )
+            val c = input.snap.bounds
+            rememberPoint("code_input", c.centerX, c.centerY)
+            Log("  输入框：${input.snap.summary()}")
+            ops.click(input, 120)
+            delay(80)
+            ok = ops.setText(input, code)
+            Log("  填码：${if (ok) "成功" else "失败"}")
+        }
+        delay(120)
         prefs.lastCode = code
         if (prefs.rememberCode) prefs.inviteCode = code
 
-        // 3) 确定
-        clickSelect("点击确定", cfg.btnConfirm)
-        delay(300)
+        // 确定（坐标缓存优先）
+        tapCached("confirm", cfg.btnConfirm, "点击确定")
+        delay(250)
     }
 
     private suspend fun verifyResult() {

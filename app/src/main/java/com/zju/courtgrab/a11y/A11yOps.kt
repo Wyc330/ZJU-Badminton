@@ -116,6 +116,52 @@ class A11yOps(private val service: AccessibilityService) {
         runCatching { it.packageName?.toString() }.getOrNull()
     }.distinct()
 
+    // ───────────────────────── 快速通道（抢场地热路径用） ─────────────────────────
+
+    fun activeRoot(): AccessibilityNodeInfo? = runCatching { service.rootInActiveWindow }.getOrNull()
+
+    /**
+     * 用系统的 findAccessibilityNodeInfosByText 直接按文字命中，
+     * 比遍历整棵树快一个数量级（10~30ms vs 50~150ms）。
+     */
+    fun findTextFast(text: String): HNode? {
+        val root = activeRoot() ?: return null
+        val hits = runCatching { root.findAccessibilityNodeInfosByText(text) }.getOrNull() ?: return null
+        for (n in hits) {
+            val t = runCatching { n.text?.toString() }.getOrNull().orEmpty()
+            val d = runCatching { n.contentDescription?.toString() }.getOrNull().orEmpty()
+            if (t.contains(text) || d.contains(text)) return HNode(n, snapshotOf(n, 0, "fast"))
+        }
+        return null
+    }
+
+    suspend fun waitTextFast(text: String, timeoutMs: Long, pollMs: Long = 60): HNode? {
+        val deadline = SystemClock.elapsedRealtime() + timeoutMs
+        do {
+            findTextFast(text)?.let { return it }
+            delay(pollMs)
+        } while (SystemClock.elapsedRealtime() < deadline)
+        return null
+    }
+
+    /** 发射点击手势但不等待回调（比 tap 少 ~40-80ms） */
+    fun tapFast(x: Float, y: Float): Boolean {
+        if (x <= 0f || y <= 0f) return false
+        val path = Path().apply { moveTo(x, y) }
+        val stroke = GestureDescription.StrokeDescription(path, 0L, 40L)
+        val gesture = GestureDescription.Builder().addStroke(stroke).build()
+        return runCatching { service.dispatchGesture(gesture, null, null) }.getOrDefault(false)
+    }
+
+    /** 当前获得输入焦点的节点（配合「点坐标 → 直接写文本」用） */
+    fun focusedEditable(): HNode? {
+        val root = activeRoot() ?: return null
+        val node = runCatching {
+            root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) ?: root.findFocus(AccessibilityNodeInfo.FOCUS_ACCESSIBILITY)
+        }.getOrNull() ?: return null
+        return HNode(node, snapshotOf(node, 0, "focus"))
+    }
+
     // ───────────────────────── 等待 ─────────────────────────
 
     /**

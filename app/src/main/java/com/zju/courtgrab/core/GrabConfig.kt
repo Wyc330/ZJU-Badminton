@@ -269,9 +269,9 @@ data class GrabConfig(
     // ⏱ 节奏参数 ─────────────────────────────────────────────────────────────
     val stepTimeoutMs: Long = 12_000,
     val navTimeoutMs: Long = 20_000,
-    val pollIntervalMs: Long = 110,
-    val afterClickDelayMs: Long = 160,
-    val afterNavDelayMs: Long = 350,
+    val pollIntervalMs: Long = 80,
+    val afterClickDelayMs: Long = 110,
+    val afterNavDelayMs: Long = 250,
     /** 截图最小间隔（系统限制约 333ms） */
     val screenshotIntervalMs: Long = 330,
     val inviteCodeWaitMs: Long = 120_000,

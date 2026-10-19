@@ -145,6 +145,11 @@ class MainActivity : AppCompatActivity() {
         b.btnReloadConfig.setOnClickListener { reloadConfig() }
         b.btnTestDate.setOnClickListener { previewDates() }
         b.btnClearLog.setOnClickListener { Logs.clear() }
+        b.btnClearTapCache.setOnClickListener {
+            prefs.tapCacheJson = ""
+            toast("点击缓存已清除，下次运行会重新学习坐标")
+            Logs.i(TAG, "点击缓存已清除")
+        }
     }
 
     /** 时间段下拉框：保存到 Prefs，抢场地时按它优先选那一行（场地号随意） */

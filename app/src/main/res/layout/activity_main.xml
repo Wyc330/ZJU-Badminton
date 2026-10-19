@@ -484,6 +484,13 @@
                 android:text="@string/btn_import_config" />
 
             <Button
+                android:id="@+id/btnClearTapCache"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="清除点击缓存（界面改版后点这个）" />
+
+            <Button
                 android:id="@+id/btnTestDate"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
