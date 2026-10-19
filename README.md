@@ -2,6 +2,8 @@
 
 <sub>项目代号：**π = 3.14** · 仓库：<https://github.com/Wyc330/ZJU-Badminton> · 协议：[MIT](LICENSE)</sub>
 
+📦 **下载 APK**：[Releases · 0.9.0alpha1](https://github.com/Wyc330/ZJU-Badminton/releases/latest) —— `app-0.9.0alpha1-debug.apk`
+
 Android 原生工程（Kotlin），用无障碍服务在「浙大体艺」里自动完成羽毛球场地预约；
 到点由精确闹钟唤醒，全自动点完流程，最后停在「提交订单」之后（按需求：不支付）。
 
