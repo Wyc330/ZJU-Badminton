@@ -93,6 +93,7 @@ class MainActivity : AppCompatActivity() {
         maybeAskNotificationPermission()
         Logs.i(TAG, "主界面已打开，无障碍已连接=${VenueAccessibilityService.isConnected}")
         handleDebugAction(intent)
+        renderPersistedResult()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -196,6 +197,8 @@ class MainActivity : AppCompatActivity() {
             }
         })
 
+        b.btnPickCompanion.setOnClickListener { pickCompanionFromApi() }
+
         b.cbDryRun.isChecked = prefs.dryRun
         b.cbDryRun.setOnCheckedChangeListener { _, checked -> prefs.dryRun = checked }
 
@@ -266,6 +269,51 @@ class MainActivity : AppCompatActivity() {
             toast("点击缓存已清除，下次运行会重新学习坐标")
             Logs.i(TAG, "点击缓存已清除")
         }
+    }
+
+    /** 从场馆接口拉同伴列表，弹窗选择后写进输入框（需要有效登录态） */
+    private fun pickCompanionFromApi() {
+        if (prefs.venueToken.isBlank()) {
+            toast("先点「登录场馆系统」登录一次，再选择同伴")
+            return
+        }
+        toast("正在拉取同伴列表…")
+        lifecycleScope.launch {
+            val list = runCatching { DirectBookingFlow.buddyList(prefs) }
+                .getOrElse {
+                    toast("拉取失败：${it.message}")
+                    return@launch
+                }
+            if (list.isEmpty()) {
+                toast("没拉到同伴（可能登录态过期，或还没添加过同伴）")
+                return@launch
+            }
+            val names = list.map { it.second }.toTypedArray()
+            AlertDialog.Builder(this@MainActivity)
+                .setTitle("选择同伴（共 ${list.size} 个）")
+                .setItems(names) { _, which ->
+                    val picked = list[which].second
+                    prefs.companionName = picked
+                    b.etCompanionName.setText(picked)
+                    toast("已选择同伴：$picked")
+                    Logs.i(TAG, "同伴选择：$picked（id=${list[which].first}）")
+                }
+                .setNegativeButton("取消", null)
+                .show()
+        }
+    }
+
+    /** 启动时把持久化的上次结果渲染出来（重启 App 也能看到） */
+    private fun renderPersistedResult() {
+        val st = FlowBus.state.value
+        if (st.running || st.success != null) return
+        val msg = prefs.lastRunMessage
+        if (msg.isBlank() || prefs.lastRunAt == 0L) return
+        lastShownFinish = prefs.lastRunAt
+        renderFlowState(
+            FlowState(running = false, success = prefs.lastRunSuccess, message = msg, finishedAt = prefs.lastRunAt),
+            showDialog = false,
+        )
     }
 
     private fun toggleDebug() {
@@ -669,7 +717,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun renderFlowState(st: FlowState) {
+    private fun renderFlowState(st: FlowState, showDialog: Boolean = true) {
         val (bgColor, textColor) = when {
             st.running -> R.color.brand_light to R.color.brand_dark
             st.success == true -> R.color.ok_light to R.color.ok
@@ -679,8 +727,8 @@ class MainActivity : AppCompatActivity() {
         b.tvFlowState.text = when {
             st.running -> "⏳ 流程运行中…（不要切走；切走会自动把浙大体艺拉回来）"
             st.success == null -> "上次结果：还没跑过"
-            st.success -> "✅ 上次成功：${st.message}"
-            else -> "❌ 上次失败：${st.message}"
+            st.success -> "✅ 上次成功${if (st.finishedAt > 0) "（" + SimpleDateFormat("MM-dd HH:mm", Locale.CHINA).format(Date(st.finishedAt)) + "）" else ""}：${st.message}"
+            else -> "❌ 上次失败${if (st.finishedAt > 0) "（" + SimpleDateFormat("MM-dd HH:mm", Locale.CHINA).format(Date(st.finishedAt)) + "）" else ""}：${st.message}"
         }
         b.tvFlowState.background = GradientDrawable().apply {
             cornerRadius = 12f * resources.displayMetrics.density
@@ -688,7 +736,13 @@ class MainActivity : AppCompatActivity() {
         }
         b.tvFlowState.setTextColor(getColorCompat(textColor))
 
-        if (!st.running && st.success != null && st.finishedAt > lastShownFinish) {
+        if (!st.running && st.success != null) {
+            // 持久化：重启 App 也能看到上次结果
+            prefs.lastRunSuccess = st.success
+            prefs.lastRunMessage = st.message
+            prefs.lastRunAt = st.finishedAt
+        }
+        if (showDialog && !st.running && st.success != null && st.finishedAt > lastShownFinish) {
             lastShownFinish = st.finishedAt
             refreshStatus()
             refreshNextRun()

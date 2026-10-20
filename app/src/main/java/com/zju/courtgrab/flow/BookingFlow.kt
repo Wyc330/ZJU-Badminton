@@ -103,7 +103,11 @@ class BookingFlow(
 
     private fun detectPageState(): PageState = runCatching {
         val booking = ops.findAll(cfg.bookingPageReady)
-        if (booking.isNotEmpty()) return@runCatching PageState.BOOKING
+        if (booking.isNotEmpty()) {
+            val usable = booking.any { it.snap.bounds.height > 5 && it.snap.bounds.width > 5 }
+            if (usable) return@runCatching PageState.BOOKING
+            Logs.w(TAG, "预约页节点高度为 0（页面没渲染好），按未知状态重新导航")
+        }
         val moduleEntry = ops.findAll(cfg.entryBooking)
         val home = ops.findAll(cfg.entryService)
         if (moduleEntry.isNotEmpty() && home.isEmpty()) return@runCatching PageState.MODULE
@@ -124,13 +128,24 @@ class BookingFlow(
                 if (!directOk) Log("直连未成功，回退界面流程")
             }
             if (directOk) {
-                FlowBus.done(true, "直连下单成功（${Logs.fullTime()}）")
+                val detail = prefs.lastDirectDetail.ifBlank { "已下单" }
+                FlowBus.done(true, "直连下单成功：$detail")
                 return
             }
         }
 
         // 智能识别当前停在哪个页面：已经到预约页就不用再跑 ①–⑧（预热/上次失败后常停在这里）
-        when (detectPageState()) {
+        var pageState = detectPageState()
+        if (pageState == PageState.UNKNOWN && ops.foregroundPackage() == cfg.targetPackage) {
+            Log("  页面状态未知（可能是空白页/WebView 没渲染），回退两层后重新识别")
+            repeat(2) {
+                ops.back()
+                delay(600)
+            }
+            delay(400)
+            pageState = detectPageState()
+        }
+        when (pageState) {
             PageState.BOOKING -> {
                 Log("✔ 检测到已在「预约场地」页，跳过启动与导航（①–⑧）")
                 ensureTargetForeground("确认预约页")
@@ -142,7 +157,7 @@ class BookingFlow(
                 step("⑦ 关闭弹窗") { dismissPopups() }
                 step("⑧ 等待预约场地页") { waitBookingPage() }
             }
-            else -> {
+            PageState.HOME, PageState.UNKNOWN -> {
                 step("① 启动目标 App") { launchTarget() }
                 step("② 关闭弹窗") { dismissPopups() }
                 step("③ 等待首页") { waitHome() }
@@ -414,17 +429,37 @@ class BookingFlow(
     private suspend fun clickSelect(name: String, locs: List<Locator>): HNode {
         ensureTargetForeground(name)
         Log("  定位：${locs.joinToString(" || ") { it.describe() }}")
-        val node = ops.waitFor(locs, cfg.stepTimeoutMs, cfg.pollIntervalMs)
-            ?: throw FlowException(
-                name,
-                "没找到控件；界面文字=${ops.visibleTextDigest()}；可点节点=${ops.clickableDigest()}",
-            )
-        Log("  命中：${node.snap.summary()}")
-        if (!ops.click(node, cfg.afterClickDelayMs)) {
-            throw FlowException(name, "点击失败：${node.snap.summary()}")
+        var last: HNode? = null
+        for (round in 0..1) {
+            val node = ops.waitFor(locs, if (round == 0) cfg.stepTimeoutMs else 1800, cfg.pollIntervalMs)
+            if (node == null) {
+                if (round == 0) {
+                    throw FlowException(
+                        name,
+                        "没找到控件；界面文字=${ops.visibleTextDigest()}；可点节点=${ops.clickableDigest()}",
+                    )
+                }
+                break
+            }
+            last = node
+            val b = node.snap.bounds
+            if (b.height <= 5 || b.width <= 5) {
+                Logs.w(TAG, "  控件尺寸异常（$b），页面可能没渲染好，刷新后重试")
+                tapRefresh()
+                delay(900)
+                continue
+            }
+            Log("  命中：${node.snap.summary()}")
+            if (ops.click(node, cfg.afterClickDelayMs)) {
+                delay(200)
+                return node
+            }
+            Logs.w(TAG, "  点击失败：${node.snap.summary()}，刷新后重试")
+            tapRefresh()
+            delay(900)
         }
-        delay(200)
-        return node
+        val h = last
+        throw FlowException(name, "点击失败：${h?.snap?.summary() ?: "没找到控件"}（页面可能卡在空白，刷新后仍失败）")
     }
 
     /**
@@ -434,10 +469,22 @@ class BookingFlow(
      * 目标 App 会退到后台，无障碍就看不到它的窗口 → 「选择时段」直接报
      * 「还原不出时段表」。现在遇到这种情况会主动重新拉起目标 App 再继续。
      */
+    private var pullAwayCount = 0
+
     private suspend fun ensureTargetForeground(where: String): Boolean {
         val fg = ops.foregroundPackage()
-        if (fg == cfg.targetPackage) return true
-        Logs.w(TAG, "  [$where] 目标 App 不在前台（当前=${fg ?: "?"}），自动重新拉起")
+        if (fg == cfg.targetPackage) {
+            pullAwayCount = 0
+            return true
+        }
+        pullAwayCount++
+        if (pullAwayCount > 4) {
+            throw FlowException(
+                where,
+                "检测到你在用其它 App，已停止流程避免打扰（被切走 $pullAwayCount 次）；要抢场地请保持屏幕亮着别操作",
+            )
+        }
+        Logs.w(TAG, "  [$where] 目标 App 不在前台（当前=${fg ?: "?"}），自动重新拉起（第 $pullAwayCount 次）")
         BgLaunch.openTarget(ctx, cfg)
         val deadline = SystemClock.elapsedRealtime() + cfg.navTimeoutMs
         while (SystemClock.elapsedRealtime() < deadline) {

@@ -46,6 +46,11 @@ object DirectBookingFlow {
             Logs.w(TAG, "未登录场馆系统（token 为空），回退界面流程")
             return false
         }
+        val tokenExp = com.zju.courtgrab.alarm.JwtUtil.expiryMs(prefs.venueToken)
+        if (tokenExp != null && tokenExp <= System.currentTimeMillis()) {
+            Logs.w(TAG, "登录态已过期，需要重新登录后再直连；本次回退界面流程")
+            return false
+        }
 
         val now = LocalDateTime.now()
         val date = DatePlanner.resolveTargetDate(now, cfg.dateCfg, cfg.releaseHour, cfg.releaseMinute)
@@ -155,7 +160,9 @@ object DirectBookingFlow {
 
             try {
                 val resp = client.submit(payload)
-                Logs.i(TAG, "✅ 直连下单成功（第 $attempt 轮）：${resp.toString().take(300)}")
+                val detail = "$date ${row.first} 场地#$spaceId"
+                prefs.lastDirectDetail = detail
+                Logs.i(TAG, "✅ 直连下单成功（第 $attempt 轮，$detail）：${resp.toString().take(300)}")
                 client.moduleAction("venue", "submit")
                 return true
             } catch (e: VenueUnauthorized) {
@@ -356,5 +363,26 @@ object DirectBookingFlow {
             else "⚠️ 解析异常：放号前 day/info 可能还没数据，9:00 后点自检更准"
         )
         sb.toString()
+    }
+
+    /**
+     * 拉取同伴列表（需要登录态），返回 (id, 名字)，供界面「选择同伴」用。
+     * 只读接口，不修改任何数据。
+     */
+    suspend fun buddyList(prefs: Prefs): List<Pair<Long, String>> = withContext(Dispatchers.IO) {
+        val client = VenueClient(prefs)
+        if (!client.isLoggedIn()) return@withContext emptyList()
+        val out = LinkedHashMap<Long, String>()
+        val root = client.buddies()
+        walk(root) { obj ->
+            val id = obj.optLong("id", -1L)
+            if (id <= 0) return@walk
+            var name = obj.optString("name", "")
+            if (name.isBlank()) name = obj.optString("nickName", "")
+            if (name.isBlank()) name = obj.optString("userName", "")
+            if (name.isBlank()) name = obj.optString("buddyName", "")
+            if (name.isNotBlank()) out.putIfAbsent(id, name)
+        }
+        out.map { it.key to it.value }
     }
 }

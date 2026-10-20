@@ -128,10 +128,37 @@ class VenueAccessibilityService : AccessibilityService() {
             } finally {
                 val cost = System.currentTimeMillis() - startAt
                 Logs.i(TAG, "===== 流程结束：${if (success) "成功" else "未成功"}，耗时 ${cost}ms =====")
-                FlowBus.done(success, "$message（耗时 ${cost / 1000}s）")
+                val finalMessage = "$message（耗时 ${cost / 1000}s）"
+                FlowBus.done(success, finalMessage)
+                runCatching {
+                    val p = com.zju.courtgrab.core.Prefs.get(applicationContext)
+                    p.lastRunSuccess = success
+                    p.lastRunMessage = finalMessage
+                    p.lastRunAt = System.currentTimeMillis()
+                }
                 Notify.showResult(applicationContext, success, "$message（耗时 ${cost / 1000}s）")
                 Notify.vibrateDone(applicationContext, success)
                 Notify.cancelFlowNotification(applicationContext)
+                // 回到我们自己的主界面，让完成提示/横幅立即可见；
+                // 但如果用户正在用别的 App，就只发通知，不抢前台
+                runCatching {
+                    val fgPkg = runCatching { ops.foregroundPackage() }.getOrNull()
+                    val targetPkg = runCatching {
+                        com.zju.courtgrab.core.ConfigRepo.load(applicationContext).targetPackage
+                    }.getOrNull()
+                    if (fgPkg == null || fgPkg == targetPkg || fgPkg == applicationContext.packageName) {
+                        startActivity(
+                            android.content.Intent(this@VenueAccessibilityService, com.zju.courtgrab.MainActivity::class.java)
+                                .addFlags(
+                                    android.content.Intent.FLAG_ACTIVITY_NEW_TASK or
+                                        android.content.Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or
+                                        android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP,
+                                ),
+                        )
+                    } else {
+                        Logs.i(TAG, "流程结束时前台是 $fgPkg（你在用其它 App），不抢前台，只发通知")
+                    }
+                }
                 running.set(false)
             }
         }

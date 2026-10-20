@@ -66,6 +66,24 @@ class Prefs private constructor(context: Context) {
         get() = sp.getString("companion_name", "").orEmpty()
         set(v) = sp.edit().putString("companion_name", v).apply()
 
+    /** 上次流程结果（持久化，重启 App 也能看到） */
+    var lastRunSuccess: Boolean
+        get() = sp.getBoolean("last_run_success", false)
+        set(v) = sp.edit().putBoolean("last_run_success", v).apply()
+
+    var lastRunMessage: String
+        get() = sp.getString("last_run_message", "").orEmpty()
+        set(v) = sp.edit().putString("last_run_message", v).apply()
+
+    var lastRunAt: Long
+        get() = sp.getLong("last_run_at", 0L)
+        set(v) = sp.edit().putLong("last_run_at", v).apply()
+
+    /** 直连成功时的详情（日期/时段/场地），用于结果展示与通知 */
+    var lastDirectDetail: String
+        get() = sp.getString("last_direct_detail", "").orEmpty()
+        set(v) = sp.edit().putString("last_direct_detail", v).apply()
+
     /** 上次静默续期尝试时间（避免反复拉起） */
     var lastSilentRefreshAt: Long
         get() = sp.getLong("last_silent_refresh_at", 0L)

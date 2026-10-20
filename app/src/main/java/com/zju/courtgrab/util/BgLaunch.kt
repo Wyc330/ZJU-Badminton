@@ -27,7 +27,13 @@ object BgLaunch {
                 pm.getLaunchIntentForPackage(pkg) ?: Intent().setPackage(pkg)
             }
         }.getOrElse { Intent().setPackage(pkg) }
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        // 独立任务栈：否则目标 App 会和我们主界面挤在同一个 task 里，
+        // 流程结束后「回到主界面」看到的还是浙大体艺
+        intent.addFlags(
+            Intent.FLAG_ACTIVITY_NEW_TASK or
+                Intent.FLAG_ACTIVITY_MULTIPLE_TASK or
+                Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED,
+        )
         return runCatching {
             context.startActivity(intent)
             Logs.i(TAG, "已请求拉起目标 App：$pkg")
