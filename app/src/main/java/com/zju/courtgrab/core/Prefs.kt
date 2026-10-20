@@ -84,6 +84,16 @@ class Prefs private constructor(context: Context) {
         get() = sp.getString("last_direct_detail", "").orEmpty()
         set(v) = sp.edit().putString("last_direct_detail", v).apply()
 
+    /** 最近一次同伴码校验失败的时间（>0 表示需要重新要码） */
+    var buddyCodeInvalidAt: Long
+        get() = sp.getLong("buddy_code_invalid_at", 0L)
+        set(v) = sp.edit().putLong("buddy_code_invalid_at", v).apply()
+
+    /** 抢到后是否自动关闭每日自动（避免第二天重复预约） */
+    var autoStopAfterSuccess: Boolean
+        get() = sp.getBoolean("auto_stop_after_success", false)
+        set(v) = sp.edit().putBoolean("auto_stop_after_success", v).apply()
+
     /** 上次静默续期尝试时间（避免反复拉起） */
     var lastSilentRefreshAt: Long
         get() = sp.getLong("last_silent_refresh_at", 0L)

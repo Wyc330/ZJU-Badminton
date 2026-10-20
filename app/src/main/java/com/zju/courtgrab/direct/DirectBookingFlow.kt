@@ -173,6 +173,7 @@ object DirectBookingFlow {
                 lastNote = "服务端拒绝（code=${e.code}）：$msg"
                 when {
                     msg.containsAny(BUDDY_CODE_HINTS) -> {
+                        prefs.buddyCodeInvalidAt = System.currentTimeMillis()
                         Logs.w(TAG, "同伴码校验失败（$msg）：同伴码是一次性的，请让同伴重新生成后填入，本次直连停止")
                         return false
                     }

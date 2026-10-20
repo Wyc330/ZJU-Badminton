@@ -115,8 +115,8 @@ class VenueAccessibilityService : AccessibilityService() {
                 success = true
                 message = "预约流程执行完成，请到「浙大体艺-我的预约」确认结果"
             } catch (e: FlowException) {
-                message = "流程失败于「${e.step}」：${e.message}"
-                Logs.e(TAG, "流程失败：$message", e.cause)
+                message = "流程失败于「${e.step}」：${humanize(e.message)}"
+                Logs.e(TAG, "流程失败：${e.step}：${e.message}", e.cause)
                 dumpUi("fail-${e.step}")
             } catch (e: kotlinx.coroutines.CancellationException) {
                 message = "流程被手动停止"
@@ -128,7 +128,18 @@ class VenueAccessibilityService : AccessibilityService() {
             } finally {
                 val cost = System.currentTimeMillis() - startAt
                 Logs.i(TAG, "===== 流程结束：${if (success) "成功" else "未成功"}，耗时 ${cost}ms =====")
-                val finalMessage = "$message（耗时 ${cost / 1000}s）"
+                var finalMessage = "$message（耗时 ${cost / 1000}s）"
+                if (success) {
+                    runCatching {
+                        val p = com.zju.courtgrab.core.Prefs.get(applicationContext)
+                        if (p.autoStopAfterSuccess) {
+                            p.enabled = false
+                            com.zju.courtgrab.alarm.AlarmScheduler.cancel(applicationContext)
+                            finalMessage += "；已自动关闭每日自动"
+                            Logs.i(TAG, "已按设置自动关闭每日自动（本次已抢到）")
+                        }
+                    }
+                }
                 FlowBus.done(success, finalMessage)
                 runCatching {
                     val p = com.zju.courtgrab.core.Prefs.get(applicationContext)
@@ -163,6 +174,12 @@ class VenueAccessibilityService : AccessibilityService() {
             }
         }
         return true
+    }
+
+    /** 失败原因转成人话：只保留第一行，过长截断（完整堆栈在日志里） */
+    private fun humanize(msg: String?): String {
+        val first = msg.orEmpty().lineSequence().firstOrNull().orEmpty().trim()
+        return if (first.length > 180) first.take(180) + "…（详情见日志）" else first
     }
 
     fun stopFlow(reason: String) {

@@ -94,6 +94,7 @@ class MainActivity : AppCompatActivity() {
         Logs.i(TAG, "主界面已打开，无障碍已连接=${VenueAccessibilityService.isConnected}")
         handleDebugAction(intent)
         renderPersistedResult()
+        renderBuddyHint()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -183,8 +184,13 @@ class MainActivity : AppCompatActivity() {
                     return
                 }
                 prefs.inviteCode = digits
+                if (digits.length == 5) {
+                    prefs.buddyCodeInvalidAt = 0L
+                    renderBuddyHint()
+                }
             }
         })
+        renderBuddyHint()
         prefs.rememberCode = false
 
         // 同伴姓名（留空=第一个同伴）
@@ -198,6 +204,12 @@ class MainActivity : AppCompatActivity() {
         })
 
         b.btnPickCompanion.setOnClickListener { pickCompanionFromApi() }
+        b.btnDiagnosisAction.setOnClickListener { runPendingFix() }
+        b.cbAutoStop.isChecked = prefs.autoStopAfterSuccess
+        b.cbAutoStop.setOnCheckedChangeListener { _, checked ->
+            prefs.autoStopAfterSuccess = checked
+            Logs.i(TAG, "成功后自动关闭每日自动 = $checked")
+        }
 
         b.cbDryRun.isChecked = prefs.dryRun
         b.cbDryRun.setOnCheckedChangeListener { _, checked -> prefs.dryRun = checked }
@@ -268,6 +280,100 @@ class MainActivity : AppCompatActivity() {
             prefs.tapCacheJson = ""
             toast("点击缓存已清除，下次运行会重新学习坐标")
             Logs.i(TAG, "点击缓存已清除")
+        }
+    }
+
+    /** 同伴码失效提示（上次校验失败后显示，填了新码自动消失） */
+    private fun renderBuddyHint() {
+        val at = prefs.buddyCodeInvalidAt
+        val fresh = at > 0 && System.currentTimeMillis() - at < 24 * 60 * 60 * 1000L
+        b.tvBuddyHint.visibility = if (fresh) View.VISIBLE else View.GONE
+    }
+
+    private enum class FixAction { NONE, LOGIN, A11Y, RETRY, OPEN_TARGET, FOCUS_CODE }
+
+    private var pendingFix: FixAction = FixAction.NONE
+
+    /** 根据上次结果给出人话诊断 + 一键处理 */
+    private fun renderDiagnosis(st: FlowState) {
+        if (st.running) {
+            b.cardDiagnosis.visibility = View.GONE
+            return
+        }
+        val msg = st.message
+        val text: String
+        val action: FixAction
+        val btn: String
+        when {
+            st.success == true -> {
+                text = "🎉 已下单成功：$msg"
+                action = FixAction.OPEN_TARGET
+                btn = "打开浙大体艺"
+            }
+            msg.isBlank() -> {
+                b.cardDiagnosis.visibility = View.GONE
+                return
+            }
+            msg.contains("登录") || msg.contains("401") || msg.contains("过期") || msg.contains("未登录") -> {
+                text = "登录态问题：场馆登录已失效，重新登录一次即可恢复直连"
+                action = FixAction.LOGIN
+                btn = "去登录"
+            }
+            msg.contains("同伴码") || msg.contains("同伴") -> {
+                text = "同伴码问题：让同伴在「同伴管理 → 我的同伴码」重新生成，再填入下方输入框"
+                action = FixAction.FOCUS_CODE
+                btn = "去填写"
+            }
+            msg.contains("无障碍") -> {
+                text = "无障碍服务未开启：打开后流程才能操作浙大体艺"
+                action = FixAction.A11Y
+                btn = "去开启"
+            }
+            msg.contains("没有可预约") || msg.contains("没有空闲") || msg.contains("已预约") -> {
+                text = "这次没抢到：目标时段已被约完；保持每日自动，下次放号继续"
+                action = FixAction.RETRY
+                btn = "再试一次"
+            }
+            msg.contains("切不到") || msg.contains("窗口") || msg.contains("未到") -> {
+                text = "还没到可预约窗口：每天 9:00 放后天的号，到点再试"
+                action = FixAction.NONE
+                btn = ""
+            }
+            msg.contains("空白") || msg.contains("没渲染") || msg.contains("拉不起") || msg.contains("页面异常") -> {
+                text = "浙大体艺页面没渲染好：点「重试」即可，App 会自动重新导航"
+                action = FixAction.RETRY
+                btn = "重试"
+            }
+            else -> {
+                text = "上次失败：$msg"
+                action = FixAction.RETRY
+                btn = "重试"
+            }
+        }
+        pendingFix = action
+        b.tvDiagnosis.text = text
+        b.cardDiagnosis.visibility = View.VISIBLE
+        b.btnDiagnosisAction.visibility = if (action == FixAction.NONE) View.GONE else View.VISIBLE
+        b.btnDiagnosisAction.text = btn
+    }
+
+    private fun runPendingFix() {
+        when (pendingFix) {
+            FixAction.LOGIN -> startActivity(
+                Intent(this, VenueLoginActivity::class.java)
+                    .putExtra(VenueLoginActivity.EXTRA_SILENT, true),
+            )
+            FixAction.A11Y -> openA11yWithGuide()
+            FixAction.RETRY -> startNow()
+            FixAction.OPEN_TARGET -> runCatching {
+                val i = packageManager.getLaunchIntentForPackage("net.crigh.mysport")
+                if (i != null) startActivity(i) else toast("没找到浙大体艺")
+            }.onFailure { toast("打开失败：${it.message}") }
+            FixAction.FOCUS_CODE -> {
+                b.etInviteCode.requestFocus()
+                toast("把同伴新生成的 5 位码填到「同伴码」输入框")
+            }
+            FixAction.NONE -> Unit
         }
     }
 
@@ -724,6 +830,7 @@ class MainActivity : AppCompatActivity() {
             st.success == false -> R.color.bad_light to R.color.bad
             else -> R.color.brand_light to R.color.text_secondary
         }
+        renderDiagnosis(st)
         b.tvFlowState.text = when {
             st.running -> "⏳ 流程运行中…（不要切走；切走会自动把浙大体艺拉回来）"
             st.success == null -> "上次结果：还没跑过"

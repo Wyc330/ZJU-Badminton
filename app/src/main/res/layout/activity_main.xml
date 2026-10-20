@@ -138,6 +138,39 @@
             android:textColor="@color/text_primary"
             android:textSize="13sp" />
 
+        <!-- ═════════ 诊断 / 下一步 ═════════ -->
+        <LinearLayout
+            android:id="@+id/cardDiagnosis"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="14dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginEnd="14dp"
+            android:background="@drawable/bg_card_soft"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="14dp"
+            android:paddingTop="10dp"
+            android:paddingEnd="8dp"
+            android:paddingBottom="10dp"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/tvDiagnosis"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textColor="@color/text_primary"
+                android:textSize="13sp" />
+
+            <Button
+                android:id="@+id/btnDiagnosisAction"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="去处理" />
+        </LinearLayout>
+
         <!-- ═════════ 运行状态 ═════════ -->
         <TextView
             style="@style/CardTitle"
@@ -529,12 +562,30 @@
                 android:textColor="@color/text_secondary"
                 android:textSize="11sp" />
 
+            <TextView
+                android:id="@+id/tvBuddyHint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="⚠️ 上次同伴码校验失败：请让同伴重新生成「我的同伴码」再填"
+                android:textColor="@color/bad"
+                android:textSize="12sp"
+                android:visibility="gone" />
+
             <CheckBox
                 android:id="@+id/cbDryRun"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
                 android:text="演练模式（走到提交订单前就停，不实际下单）"
+                android:textColor="@color/text_primary"
+                android:textSize="13sp" />
+
+            <CheckBox
+                android:id="@+id/cbAutoStop"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="成功后自动关闭每日自动（避免第二天重复预约）"
                 android:textColor="@color/text_primary"
                 android:textSize="13sp" />
 
