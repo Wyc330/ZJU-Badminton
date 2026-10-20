@@ -129,4 +129,21 @@ class SlotGridTest {
         assertEquals(1, pick.cell.colIndex)
         assertEquals(SlotState.AVAILABLE, pick.state)
     }
+
+    @Test
+    fun `multi point voting picks the majority state`() {
+        val cfg = SlotGridConfig()
+        val green = Rgb(0x67, 0xC2, 0x3A)
+        val red = Rgb(0xFE, 0x4B, 0x37)
+        val white = Rgb(255, 255, 255)
+        // 3 绿 2 白 → 取绿（空闲）
+        assertEquals(SlotState.AVAILABLE, SlotGrid.classifyMost(listOf(green, green, green, white, white), cfg))
+        // 1 绿 3 红 1 白 → 取红（已预约）
+        assertEquals(SlotState.BOOKED, SlotGrid.classifyMost(listOf(green, red, red, red, white), cfg))
+    }
+
+    @Test
+    fun `multi point voting on empty list is unknown`() {
+        assertEquals(SlotState.UNKNOWN, SlotGrid.classifyMost(emptyList(), SlotGridConfig()))
+    }
 }

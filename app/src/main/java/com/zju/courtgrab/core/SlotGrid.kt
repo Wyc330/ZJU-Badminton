@@ -94,6 +94,13 @@ object SlotGrid {
     private fun colors(list: List<String>): List<Rgb> =
         list.mapNotNull { Rgb.parse(it) }
 
+    /** 多点投票：同一格子取多个采样颜色时，按状态出现次数取多数，投票平局取先出现的 */
+    fun classifyMost(rgbs: List<Rgb>, cfg: SlotGridConfig): SlotState {
+        if (rgbs.isEmpty()) return SlotState.UNKNOWN
+        val counts = rgbs.map { classify(it, cfg) }.groupingBy { it }.eachCount()
+        return counts.maxByOrNull { it.value }?.key ?: SlotState.UNKNOWN
+    }
+
     fun classify(rgb: Rgb, cfg: SlotGridConfig): SlotState {
         if (rgb.isNearWhite()) return SlotState.UNKNOWN
         val candidates = listOf(

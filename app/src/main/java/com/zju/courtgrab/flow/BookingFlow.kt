@@ -945,18 +945,10 @@ class BookingFlow(
             cx to (cy - dy),
             cx to (cy + dy),
         )
-        val sampled = points.map { (x, y) ->
-            val rgb = cap.sampleRegion(bitmap, x, y, cfg.slotSampleRadius) ?: return@map null
-            rgb to SlotGrid.classify(rgb, cfg.slotGridCfg)
-        }
-        // 多数票：哪个状态出现最多就用它对应的颜色
-        val counts = sampled.mapNotNull { it }.groupingBy { it.second }.eachCount()
-        val bestState = counts.maxByOrNull { it.value }?.key
-        if (bestState != null) {
-            val hit = sampled.firstOrNull { it != null && it.second == bestState } ?: sampled.firstOrNull { it != null }
-            if (hit != null) return hit.first
-        }
-        return Rgb(255, 255, 255)
+        val rgbs = points.mapNotNull { (x, y) -> cap.sampleRegion(bitmap, x, y, cfg.slotSampleRadius) }
+        if (rgbs.isEmpty()) return Rgb(255, 255, 255)
+        val bestState = SlotGrid.classifyMost(rgbs, cfg.slotGridCfg)
+        return rgbs.firstOrNull { SlotGrid.classify(it, cfg.slotGridCfg) == bestState } ?: rgbs.first()
     }
 
     private suspend fun scanForSlot(fridayOnly: Boolean): SlotPick? {
