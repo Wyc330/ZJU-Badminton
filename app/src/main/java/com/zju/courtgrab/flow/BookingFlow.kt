@@ -358,6 +358,22 @@ class BookingFlow(
         timeoutMs: Long = cfg.stepTimeoutMs,
     ): Boolean {
         ensureTargetForeground(name)
+        // 学习坐标：第二次起直接按坐标点，省掉遍历节点树找入口
+        val cacheKey = "nav_$name"
+        cachedPoint(cacheKey)?.let { p ->
+            Log("  $name：用学习坐标 (${p.first}, ${p.second})")
+            ops.tapFast(p.first.toFloat(), p.second.toFloat())
+            if (expected.isEmpty()) {
+                delay(cfg.afterNavDelayMs)
+                return true
+            }
+            val ready = ops.waitFor(expected, 2600, 120)
+            if (ready != null) {
+                Log("  ✔ 学习坐标生效 → ${ready.snap.summary()}")
+                return true
+            }
+            Logs.w(TAG, "  $name：学习坐标没生效，回退正常定位")
+        }
         val deadline = SystemClock.elapsedRealtime() + timeoutMs
         do {
             val nodes = ops.collect()
@@ -372,12 +388,14 @@ class BookingFlow(
                     if (!ops.click(h, cfg.afterClickDelayMs)) continue
                     if (expected.isEmpty()) {
                         Log("  ✔ 已点击：${h.snap.summary()}")
+                        rememberPoint(cacheKey, h.snap.bounds.centerX, h.snap.bounds.centerY)
                         delay(cfg.afterNavDelayMs)
                         return true
                     }
                     val ready = ops.waitFor(expected, 2600, 120)
                     if (ready != null) {
                         Log("  ✔ 点击生效：${h.snap.summary()} → ${ready.snap.summary()}")
+                        rememberPoint(cacheKey, h.snap.bounds.centerX, h.snap.bounds.centerY)
                         return true
                     }
                     Logs.w(TAG, "  点了 ${h.snap.summary()} 但目标页未出现，试下一个候选")

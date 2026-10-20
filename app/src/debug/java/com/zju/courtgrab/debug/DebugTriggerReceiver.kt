@@ -17,6 +17,34 @@ class DebugTriggerReceiver : BroadcastReceiver() {
         Logs.init(context)
         Logs.i("DebugTrigger", "收到调试动作：$action")
 
+        // 开关类调试动作：直接在 receiver 内完成，不拉起界面
+        if (action in setOf("enable_on", "enable_off", "dryrun_on", "dryrun_off")) {
+            runCatching {
+                val prefs = com.zju.courtgrab.core.Prefs.get(context)
+                when (action) {
+                    "enable_on" -> {
+                        prefs.enabled = true
+                        val ok = com.zju.courtgrab.alarm.AlarmScheduler.schedule(context, prefs)
+                        Logs.i("DebugTrigger", "已启用每日自动，排闹钟=$ok")
+                    }
+                    "enable_off" -> {
+                        prefs.enabled = false
+                        com.zju.courtgrab.alarm.AlarmScheduler.cancel(context)
+                        Logs.i("DebugTrigger", "已关闭每日自动")
+                    }
+                    "dryrun_on" -> {
+                        prefs.dryRun = true
+                        Logs.i("DebugTrigger", "演练模式=开")
+                    }
+                    "dryrun_off" -> {
+                        prefs.dryRun = false
+                        Logs.i("DebugTrigger", "演练模式=关（会真实下单）")
+                    }
+                }
+            }.onFailure { Logs.w("DebugTrigger", "开关调试失败：${it.message}") }
+            return
+        }
+
         // 不打扰用户的通知类调试：直接在本 receiver 里完成，不拉起界面
         if (action == "prep_notify" || action == "prep_notify_check") {
             runCatching {

@@ -118,6 +118,22 @@ class MainActivity : AppCompatActivity() {
                 "dryrun_off" -> { prefs.dryRun = false; b.cbDryRun.isChecked = false; toast("演练模式：关") }
                 "direct_on" -> { prefs.directMode = true; b.cbDirectMode.isChecked = true; renderDirectStatus() }
                 "direct_off" -> { prefs.directMode = false; b.cbDirectMode.isChecked = false; renderDirectStatus() }
+                "enable_on" -> {
+                    prefs.enabled = true
+                    b.swEnabled.isChecked = true
+                    AlarmScheduler.schedule(this, prefs)
+                    refreshNextRun()
+                    toast("已启用每日自动")
+                    Logs.i(TAG, "调试动作：启用每日自动")
+                }
+                "enable_off" -> {
+                    prefs.enabled = false
+                    b.swEnabled.isChecked = false
+                    AlarmScheduler.cancel(this)
+                    refreshNextRun()
+                    toast("已关闭每日自动")
+                    Logs.i(TAG, "调试动作：关闭每日自动")
+                }
                 "prewarm_silent" -> startActivity(
                     Intent(this, VenueLoginActivity::class.java)
                         .putExtra(VenueLoginActivity.EXTRA_SILENT, true),
