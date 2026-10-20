@@ -96,7 +96,7 @@ object Notify {
 
     fun buildForeground(context: Context, title: String, text: String) =
         NotificationCompat.Builder(context, CH_FLOW)
-            .setSmallIcon(R.drawable.ic_launcher)
+            .setSmallIcon(R.drawable.ic_notify)
             .setContentTitle(title)
             .setContentText(text)
             .setOngoing(true)
@@ -121,7 +121,7 @@ object Notify {
             return
         }
         val builder = NotificationCompat.Builder(context, CH_ALARM)
-            .setSmallIcon(R.drawable.ic_launcher)
+            .setSmallIcon(R.drawable.ic_notify)
             .setContentTitle("到点了：请输入本次 5 位同伴码")
             .setContentText("点这里输入同伴码，App 会自动继续预约流程")
             .setPriority(NotificationCompat.PRIORITY_MAX)
@@ -138,7 +138,7 @@ object Notify {
         ensureChannels(context)
         if (!canNotify(context)) return
         val builder = NotificationCompat.Builder(context, CH_RESULT_HIGH)
-            .setSmallIcon(R.drawable.ic_launcher)
+            .setSmallIcon(R.drawable.ic_notify)
             .setContentTitle(if (success) "✅ 抢场地完成" else "❌ 抢场地失败")
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
@@ -161,7 +161,7 @@ object Notify {
             NotificationManagerCompat.from(context).notify(
                 ID_PREP,
                 NotificationCompat.Builder(context, CH_ALARM)
-                    .setSmallIcon(R.drawable.ic_launcher)
+                    .setSmallIcon(R.drawable.ic_notify)
                     .setContentTitle(title)
                     .setContentText(text)
                     .setStyle(NotificationCompat.BigTextStyle().bigText(text))
@@ -178,7 +178,7 @@ object Notify {
         ensureChannels(context)
         if (!canNotify(context)) return
         val builder = NotificationCompat.Builder(context, CH_RESULT)
-            .setSmallIcon(R.drawable.ic_launcher)
+            .setSmallIcon(R.drawable.ic_notify)
             .setContentTitle("界面抓取完成：$nodeCount 个节点")
             .setContentText("点这里回到「抢场地」，再点「分享最近一次抓取」把文件发出来")
             .setStyle(

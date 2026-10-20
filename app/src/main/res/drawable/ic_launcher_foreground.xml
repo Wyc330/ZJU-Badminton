@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 自适应图标前景：羽毛球（安全区内居中） -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- 羽毛裙（白色梯形 + 分隔线） -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M54,26 L70,50 L62,72 L46,72 L38,50 Z" />
+    <path
+        android:fillColor="#FF1A6FEB"
+        android:pathData="M54,30 L60,50 L54,66 L48,50 Z" />
+    <!-- 软木球头 -->
+    <path
+        android:fillColor="#FFFFD54F"
+        android:pathData="M54,72 m-9,0 a9,9 0 1,0 18,0 a9,9 0 1,0 -18,0" />
+    <path
+        android:fillColor="#FFFFB300"
+        android:pathData="M54,66 h7 a9,9 0 0 0 -14,0 z" />
+</vector>

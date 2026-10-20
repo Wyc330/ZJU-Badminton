@@ -40,17 +40,15 @@ class PrewarmReceiver : BroadcastReceiver() {
             } else "?"
             val token = prefs.venueToken
             val exp = if (token.isBlank()) null else JwtUtil.expiryMs(token)
-            val tokenText = when {
-                token.isBlank() -> "未登录（直连不可用）"
-                exp != null && exp <= System.currentTimeMillis() -> "已过期（需重新登录）"
-                exp != null -> "正常（剩余 ${(exp - System.currentTimeMillis()) / 60000} 分钟）"
-                else -> "已登录"
-            }
-            val codeText = if (prefs.inviteCode.length == 5) "已填" else "未填（到点会弹窗问）"
+            val tokenText = com.zju.courtgrab.core.PrepReminder.tokenText(
+                token, exp, System.currentTimeMillis(),
+            )
             com.zju.courtgrab.util.Notify.showPrepReminder(
                 context,
-                "9:00 放号提醒：$dateText",
-                "目标日期：$dateText\n登录态：$tokenText\n同伴码：$codeText\n直连：${if (prefs.directMode) "开" else "关"}；点击打开 App 检查",
+                com.zju.courtgrab.core.PrepReminder.title(dateText),
+                com.zju.courtgrab.core.PrepReminder.body(
+                    dateText, tokenText, prefs.inviteCode.length == 5, prefs.directMode,
+                ),
             )
         }.onFailure { Logs.w(TAG, "准备提醒失败：${it.message}") }
 

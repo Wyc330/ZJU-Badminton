@@ -17,4 +17,5 @@
     <color name="ok_light">#FFDCFCE7</color>
     <color name="bad_light">#FFFEE2E2</color>
     <color name="warn_light">#FFFEF3C7</color>
+    <color name="ic_launcher_background">#FF1A6FEB</color>
 </resources>
