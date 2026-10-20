@@ -33,6 +33,7 @@ object Notify {
     const val ID_FOREGROUND = 1001
     const val ID_CODE_REQUEST = 1002
     const val ID_RESULT = 1003
+    const val ID_PREP = 1004
 
     fun ensureChannels(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
@@ -152,6 +153,27 @@ object Notify {
     }
 
     /** 延时抓取完成通知（点一下回到 App 查看/分享文件） */
+    /** 放号前 12 分钟的准备提醒（登录态/同伴码状态一眼可见） */
+    fun showPrepReminder(context: Context, title: String, text: String) {
+        ensureChannels(context)
+        if (!canNotify(context)) return
+        runCatching {
+            NotificationManagerCompat.from(context).notify(
+                ID_PREP,
+                NotificationCompat.Builder(context, CH_ALARM)
+                    .setSmallIcon(R.drawable.ic_launcher)
+                    .setContentTitle(title)
+                    .setContentText(text)
+                    .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+                    .setPriority(NotificationCompat.PRIORITY_HIGH)
+                    .setAutoCancel(true)
+                    .setContentIntent(mainIntent(context))
+                    .build(),
+            )
+            Logs.i(TAG, "已发准备提醒：$title")
+        }.onFailure { Logs.w(TAG, "准备提醒失败：${it.message}") }
+    }
+
     fun showDumpDone(context: Context, nodeCount: Int, path: String) {
         ensureChannels(context)
         if (!canNotify(context)) return

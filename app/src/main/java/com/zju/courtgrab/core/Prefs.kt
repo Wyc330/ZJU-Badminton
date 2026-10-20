@@ -94,6 +94,11 @@ class Prefs private constructor(context: Context) {
         get() = sp.getBoolean("auto_stop_after_success", false)
         set(v) = sp.edit().putBoolean("auto_stop_after_success", v).apply()
 
+    /** 首次使用引导是否已展示 */
+    var guideShown: Boolean
+        get() = sp.getBoolean("guide_shown", false)
+        set(v) = sp.edit().putBoolean("guide_shown", v).apply()
+
     /** 上次静默续期尝试时间（避免反复拉起） */
     var lastSilentRefreshAt: Long
         get() = sp.getLong("last_silent_refresh_at", 0L)

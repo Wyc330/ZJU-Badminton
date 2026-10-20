@@ -24,8 +24,38 @@ class PrewarmReceiver : BroadcastReceiver() {
         Logs.init(context)
         val prefs = Prefs.get(context)
         Logs.i(TAG, "⏰ 预热触发（放号前 12 分钟）")
+        if (!prefs.enabled) {
+            Logs.i(TAG, "每日自动未启用，跳过预热")
+            return
+        }
+
+        // ① 先发一条「准备提醒」：目标日期 + 登录态 + 同伴码状态，一眼看清要不要动手
+        runCatching {
+            val cfg = com.zju.courtgrab.core.ConfigRepo.load(context)
+            val date = com.zju.courtgrab.core.DatePlanner.resolveTargetDate(
+                java.time.LocalDateTime.now(), cfg.dateCfg, cfg.releaseHour, cfg.releaseMinute,
+            )
+            val dateText = if (date != null) {
+                "${date.monthValue}/${date.dayOfMonth} ${com.zju.courtgrab.core.DatePlanner.weekdayCn(date.dayOfWeek)}"
+            } else "?"
+            val token = prefs.venueToken
+            val exp = if (token.isBlank()) null else JwtUtil.expiryMs(token)
+            val tokenText = when {
+                token.isBlank() -> "未登录（直连不可用）"
+                exp != null && exp <= System.currentTimeMillis() -> "已过期（需重新登录）"
+                exp != null -> "正常（剩余 ${(exp - System.currentTimeMillis()) / 60000} 分钟）"
+                else -> "已登录"
+            }
+            val codeText = if (prefs.inviteCode.length == 5) "已填" else "未填（到点会弹窗问）"
+            com.zju.courtgrab.util.Notify.showPrepReminder(
+                context,
+                "9:00 放号提醒：$dateText",
+                "目标日期：$dateText\n登录态：$tokenText\n同伴码：$codeText\n直连：${if (prefs.directMode) "开" else "关"}；点击打开 App 检查",
+            )
+        }.onFailure { Logs.w(TAG, "准备提醒失败：${it.message}") }
+
         if (!prefs.directMode) {
-            Logs.i(TAG, "没开直连模式，跳过预热")
+            Logs.i(TAG, "没开直连模式，只发提醒不续期")
             return
         }
         val token = prefs.venueToken

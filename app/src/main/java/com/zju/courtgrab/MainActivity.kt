@@ -95,6 +95,7 @@ class MainActivity : AppCompatActivity() {
         handleDebugAction(intent)
         renderPersistedResult()
         renderBuddyHint()
+        showFirstRunGuide()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -281,6 +282,24 @@ class MainActivity : AppCompatActivity() {
             toast("点击缓存已清除，下次运行会重新学习坐标")
             Logs.i(TAG, "点击缓存已清除")
         }
+    }
+
+    /** 首次使用引导：一次说明清 4 件事 */
+    private fun showFirstRunGuide() {
+        if (prefs.guideShown) return
+        prefs.guideShown = true
+        AlertDialog.Builder(this)
+            .setTitle("欢迎使用 抢场地")
+            .setMessage(
+                "第一次用，按这 4 步来：\n\n" +
+                    "1. 把「运行状态」里的 5 项权限都打开（无障碍最关键）\n" +
+                    "2. 点「登录场馆系统」登录一次（学号密码只在你这台手机上输入）\n" +
+                    "3. 让同伴把「我的同伴码」发你，填到「同伴码」；再选好想约的时间段\n" +
+                    "4. 打开「启用每日自动抢场地」，到 9:00 自动执行；建议先开「演练模式」试跑一次\n\n" +
+                    "流程结束后不管成功失败都会弹提示/通知，不会让你猜。",
+            )
+            .setPositiveButton("开始设置", null)
+            .show()
     }
 
     /** 同伴码失效提示（上次校验失败后显示，填了新码自动消失） */
