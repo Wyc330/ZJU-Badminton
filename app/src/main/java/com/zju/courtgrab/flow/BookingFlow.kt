@@ -849,7 +849,7 @@ class BookingFlow(
                 cells = row.cells.mapIndexed { idx, cell ->
                     val x = cell.centerX + cfg.slotGridCfg.sampleOffsetX
                     val y = cell.centerY + cfg.slotGridCfg.sampleOffsetY
-                    val rgb = cap.sampleRegion(bitmap, x, y, cfg.slotSampleRadius) ?: Rgb(255, 255, 255)
+                    val rgb = sampleCellRgb(bitmap, cell.box)
                     SlotCellSample(
                         rowIndex = row.startMinute,
                         colIndex = idx,
@@ -901,9 +901,15 @@ class BookingFlow(
                     rowIndex = i,
                     rowLabel = h.snap.text?.trim(),
                     cells = uniqueCols.mapIndexed { j, c ->
-                        val x = c.snap.bounds.centerX + cfg.slotGridCfg.sampleOffsetX
-                        val y = h.snap.bounds.centerY + cfg.slotGridCfg.sampleOffsetY
-                        val rgb = cap.sampleRegion(bitmap, x, y, cfg.slotSampleRadius) ?: Rgb(255, 255, 255)
+                        val cellBox = Box(
+                            left = c.snap.bounds.left,
+                            top = h.snap.bounds.top,
+                            right = c.snap.bounds.right,
+                            bottom = h.snap.bounds.bottom,
+                        )
+                        val x = cellBox.centerX + cfg.slotGridCfg.sampleOffsetX
+                        val y = cellBox.centerY + cfg.slotGridCfg.sampleOffsetY
+                        val rgb = sampleCellRgb(bitmap, cellBox)
                         SlotCellSample(i, j, h.snap.text?.trim(), c.snap.text?.trim(), rgb, x, y)
                     },
                 )
@@ -922,6 +928,37 @@ class BookingFlow(
      * 扫描 + 滚动：先在当前可见区域找绿格；没有就向下滚（后面的时间段），
      * 再没有就向右滚（后面的场地号）。最多几轮，避免抢的时候磨蹭太久。
      */
+    /**
+     * 多点采样：格子中心 + 四个偏移点各取一次颜色，按 SlotState 投票。
+     * 解决「边缘/渐变/动画中/被遮挡」导致单点采样判成未知的问题（之前第 1 列常被判未知）。
+     */
+    private fun sampleCellRgb(bitmap: Bitmap, cell: Box): Rgb {
+        val dx = (cell.width * 0.15f).toInt().coerceAtLeast(4)
+        val dy = (cell.height * 0.15f).toInt().coerceAtLeast(3)
+        // 格子可能贴边/部分在屏幕外：把采样中心夹回屏幕内，避免第一列整列判「未知」
+        val cx = cell.centerX.coerceIn(3, (bitmap.width - 4).coerceAtLeast(3))
+        val cy = cell.centerY.coerceIn(3, (bitmap.height - 4).coerceAtLeast(3))
+        val points = listOf(
+            (cx + cfg.slotGridCfg.sampleOffsetX) to (cy + cfg.slotGridCfg.sampleOffsetY),
+            (cx - dx) to cy,
+            (cx + dx) to cy,
+            cx to (cy - dy),
+            cx to (cy + dy),
+        )
+        val sampled = points.map { (x, y) ->
+            val rgb = cap.sampleRegion(bitmap, x, y, cfg.slotSampleRadius) ?: return@map null
+            rgb to SlotGrid.classify(rgb, cfg.slotGridCfg)
+        }
+        // 多数票：哪个状态出现最多就用它对应的颜色
+        val counts = sampled.mapNotNull { it }.groupingBy { it.second }.eachCount()
+        val bestState = counts.maxByOrNull { it.value }?.key
+        if (bestState != null) {
+            val hit = sampled.firstOrNull { it != null && it.second == bestState } ?: sampled.firstOrNull { it != null }
+            if (hit != null) return hit.first
+        }
+        return Rgb(255, 255, 255)
+    }
+
     private suspend fun scanForSlot(fridayOnly: Boolean): SlotPick? {
         var vertical = 0
         var horizontal = 0
