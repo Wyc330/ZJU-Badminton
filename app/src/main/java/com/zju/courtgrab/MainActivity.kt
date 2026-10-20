@@ -266,6 +266,20 @@ class MainActivity : AppCompatActivity() {
         b.btnStartNow.setOnClickListener { startNow() }
         b.btnStop.setOnClickListener { stopFlow() }
 
+        // 页脚：版本 + 仓库链接
+        runCatching {
+            @Suppress("DEPRECATION")
+            val version = packageManager.getPackageInfo(packageName, 0).versionName
+            b.tvAbout.text = "抢场地 v$version · MIT · 点击查看源码"
+        }
+        b.tvAbout.setOnClickListener {
+            runCatching {
+                startActivity(
+                    Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/Wyc330/ZJU-Badminton")),
+                )
+            }.onFailure { toast("打不开浏览器：${it.message}") }
+        }
+
         // 调试
         b.btnToggleDebug.setOnClickListener { toggleDebug() }
         b.btnSelfCheck.setOnClickListener { runSelfCheck() }

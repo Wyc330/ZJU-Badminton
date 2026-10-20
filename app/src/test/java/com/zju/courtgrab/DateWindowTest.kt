@@ -7,6 +7,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalDateTime
 
@@ -16,7 +17,14 @@ import java.time.LocalDateTime
  */
 class DateWindowTest {
 
-    private val cfg = GrabConfig.DEFAULT.dateCfg
+    // 这组用例测的是「窗口 + 星期优先级」旧逻辑，所以显式给固定配置，避免受生产默认值变化影响
+    private val cfg = DatePlanConfig(
+        weekdayPriority = listOf(DayOfWeek.FRIDAY, DayOfWeek.SATURDAY, DayOfWeek.SUNDAY),
+        includeToday = true,
+        maxDaysAhead = 2,
+        useNextReleaseDate = false,
+        fridayAfternoonOnly = true,
+    )
 
     private fun at(y: Int, m: Int, d: Int) = LocalDateTime.of(y, m, d, 8, 0)
 

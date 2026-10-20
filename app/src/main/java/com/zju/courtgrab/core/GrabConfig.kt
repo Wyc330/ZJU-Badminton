@@ -120,8 +120,10 @@ data class GrabConfig(
     val dateCfg: DatePlanConfig = DatePlanConfig(
         weekdayPriority = listOf(DayOfWeek.FRIDAY, DayOfWeek.SATURDAY, DayOfWeek.SUNDAY),
         includeToday = true,
-        maxDaysAhead = 2,
-        fridayAfternoonOnly = true,
+        maxDaysAhead = 0,
+        useNextReleaseDate = true,
+        releaseDaysAhead = 2,
+        fridayAfternoonOnly = false,
         datePatterns = listOf(
             "(\\d{4})\\s*[-/\\.年]\\s*(\\d{1,2})\\s*[-/\\.月]\\s*(\\d{1,2})",
             "(\\d{1,2})\\s*[-/\\.月]\\s*(\\d{1,2})\\s*日?",

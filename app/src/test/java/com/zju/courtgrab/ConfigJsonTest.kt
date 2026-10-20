@@ -112,4 +112,25 @@ class ConfigJsonTest {
         assertTrue(s, s.contains("周六 10-24"))
         assertTrue(s, s.contains("周日 10-25"))
     }
+
+    @Test
+    fun `date cfg defaults to next release day strategy`() {
+        val cfg = GrabConfig.DEFAULT
+        assertTrue(cfg.dateCfg.useNextReleaseDate)
+        assertEquals(2, cfg.dateCfg.releaseDaysAhead)
+        assertEquals(false, cfg.dateCfg.fridayAfternoonOnly)
+    }
+
+    @Test
+    fun `direct polling config round trips`() {
+        val cfg = GrabConfig.DEFAULT
+        val back = ConfigJson.merge(GrabConfig.DEFAULT, ConfigJson.toJson(cfg))
+        assertEquals(cfg.directVenueName, back.directVenueName)
+        assertEquals(cfg.directMaxWaitMs, back.directMaxWaitMs)
+        assertEquals(cfg.directPollMinMs, back.directPollMinMs)
+        assertEquals(cfg.directPollJitterMs, back.directPollJitterMs)
+        assertEquals(cfg.directMaxAttempts, back.directMaxAttempts)
+        assertEquals(cfg.dateCfg.useNextReleaseDate, back.dateCfg.useNextReleaseDate)
+        assertEquals(cfg.dateCfg.releaseDaysAhead, back.dateCfg.releaseDaysAhead)
+    }
 }

@@ -1,95 +1,61 @@
 {
+  "_comment": "完整字段见 App 内「导出默认配置」；这里是最常改的部分，键名与代码一致",
   "targetPackage": "net.crigh.mysport",
-
-  "popupClosers": [
-    { "contains": "关闭" },
-    { "text": "×" },
-    { "desc": "关闭" },
-    { "contains": "我知道了" }
-  ],
-
-  "entryService": [
-    { "id": "tv_home_model_title", "contains": "场馆服务" },
-    { "contains": "场馆服务" }
-  ],
-  "entryBooking": [
-    { "contains": "场馆预约" }
-  ],
-  "bookingPageReady": [
-    { "contains": "预约日期" },
-    { "contains": "我要预约" }
-  ],
-
-  "campusTarget": "紫金港校区",
-  "campusSelect": [{ "contains": "紫金港校区" }],
-
-  "venueFengYu": [{ "contains": "风雨操场" }],
-  "venueBadminton": [{ "contains": "羽毛球场" }, { "contains": "羽毛球" }],
-
-  "dateDisplay": { "regex": "\\d{4}\\s*[-/]\\s*\\d{1,2}\\s*[-/]\\s*\\d{1,2}" },
-  "dateArrowFallbackRatio": 1.15,
-  "dateCfg": {
-    "weekdayPriority": ["FRIDAY", "SATURDAY", "SUNDAY"],
-    "includeToday": true,
-    "maxDaysAhead": 2,
-    "fridayAfternoonOnly": true,
-    "datePatterns": [
-      "(\\d{4})\\s*[-/\\.年]\\s*(\\d{1,2})\\s*[-/\\.月]\\s*(\\d{1,2})",
-      "(\\d{1,2})\\s*[-/\\.月]\\s*(\\d{1,2})\\s*日?"
-    ]
-  },
-  "requirePreferredWeekday": true,
-  "preferFreshDates": true,
 
   "releaseHour": 9,
   "releaseMinute": 0,
   "releaseSecond": 0,
   "waitForRelease": true,
-  "refreshTapRatio": 2.5,
   "slotRetryMs": 20000,
 
-  "slotRowLabel": { "regex": "\\d{1,2}\\s*[:：]\\s*\\d{2}\\s*[-~—－–]\\s*\\d{1,2}\\s*[:：]\\s*\\d{2}", "order": "TOP_LEFT" },
+  "dateCfg": {
+    "useNextReleaseDate": true,
+    "releaseDaysAhead": 2,
+    "fridayAfternoonOnly": false,
+    "includeToday": true,
+    "maxDaysAhead": 0,
+    "datePatterns": [
+      "(\\d{4})\\s*[-/\\.年]\\s*(\\d{1,2})\\s*[-/\\.月]\\s*(\\d{1,2})",
+      "(\\d{1,2})\\s*[-/\\.月]\\s*(\\d{1,2})\\s*日?"
+    ]
+  },
+
+  "preferredSlotStart": "",
+  "turboMode": true,
+
+  "directVenueName": "风雨操场",
+  "directVenueSiteId": 0,
+  "directMaxWaitMs": 120000,
+  "directPollMinMs": 250,
+  "directPollJitterMs": 400,
+  "directMaxAttempts": 240,
+
+  "companionName": "",
+  "inviteCodeWaitMs": 120000,
+
+  "entryService": [
+    { "id": "tv_home_model_title", "contains": "场馆服务" },
+    { "contains": "场馆服务" }
+  ],
+  "entryBooking": [{ "contains": "场馆预约" }],
+  "bookingPageReady": [
+    { "contains": "预约日期" },
+    { "contains": "我要预约" }
+  ],
+  "campusTarget": "紫金港校区",
+  "venueFengYu": [{ "contains": "风雨操场" }],
+  "venueBadminton": [{ "contains": "羽毛球场" }, { "contains": "羽毛球" }],
+
+  "slotRowLabel": {
+    "regex": "\\d{1,2}\\s*[:：]\\s*\\d{2}\\s*[-~—－–]\\s*\\d{1,2}\\s*[:：]\\s*\\d{2}",
+    "order": "TOP_LEFT"
+  },
   "slotColumnHeader": { "regex": "^\\s*\\d+\\s*号\\s*$", "order": "LEFT_TOP" },
-  "slotSampleRadius": 5,
-  "slotVerifyByRecapture": true,
   "slotGridCfg": {
     "availableColors": ["#67C23A", "#52C41A", "#4CAF50", "#6BCB77", "#8ECF75"],
     "bookedColors": ["#FE4B37", "#EB5E54", "#F5333F", "#FF4D3A"],
     "unpaidColors": ["#FFB800", "#FAAD14", "#FEC43F", "#FFC107"],
     "selectedColors": ["#40A9FF", "#75BEF3", "#1890FF"],
-    "closedColors": ["#D9D9D9", "#BFBFBF", "#EEEEEE", "#E0E0E0"],
-    "tolerance": 120,
-    "skipFirstRows": 1,
-    "skipLastRows": 1,
-    "fridaySkipMorning": true,
-    "sampleOffsetX": 0,
-    "sampleOffsetY": 0
-  },
-  "slotCfg": {
-    "morningPattern": "(上午|早上|早晨|AM|\\b0?[6-9]\\s*[:：]|\\b1[01]\\s*[:：])",
-    "afternoonPattern": "(下午|傍晚|晚上|PM|\\b1[2-9]\\s*[:：]|\\b2[0-3]\\s*[:：])"
-  },
-
-  "agreeCheckbox": [{ "contains": "已阅读并同意" }],
-  "btnBookNow": [{ "contains": "我要预约" }],
-
-  "companionPageReady": [
-    { "contains": "同伴信息" },
-    { "contains": "提交订单" }
-  ],
-  "companionName": "",
-  "companionCandidates": [{ "class": "CheckBox", "index": 0 }],
-  "companionFallback": [{ "contains": "点击这里" }, { "contains": "添加同伴" }],
-  "companionCodeHint": [{ "contains": "同伴码" }],
-
-  "codeInput": [{ "class": "EditText" }, { "class": "AutoCompleteTextView" }],
-  "btnConfirm": [{ "text": "确定" }, { "text": "确认" }],
-  "btnSubmitOrder": [{ "contains": "提交订单" }],
-
-  "stepTimeoutMs": 12000,
-  "navTimeoutMs": 20000,
-  "afterClickDelayMs": 550,
-  "afterNavDelayMs": 900,
-  "screenshotIntervalMs": 450,
-  "inviteCodeWaitMs": 120000
+    "closedColors": ["#D9D9D9", "#BFBFBF", "#EEEEEE", "#E0E0E0"]
+  }
 }
