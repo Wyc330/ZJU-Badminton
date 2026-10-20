@@ -14,7 +14,36 @@ import com.zju.courtgrab.core.Logs
 class DebugTriggerReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.getStringExtra("action").orEmpty()
+        Logs.init(context)
         Logs.i("DebugTrigger", "收到调试动作：$action")
+
+        // 不打扰用户的通知类调试：直接在本 receiver 里完成，不拉起界面
+        if (action == "prep_notify" || action == "prep_notify_check") {
+            runCatching {
+                val prefs = com.zju.courtgrab.core.Prefs.get(context)
+                val cfg = com.zju.courtgrab.core.ConfigRepo.load(context)
+                val date = com.zju.courtgrab.core.DatePlanner.resolveTargetDate(
+                    java.time.LocalDateTime.now(), cfg.dateCfg, cfg.releaseHour, cfg.releaseMinute,
+                )
+                val dateText = if (date != null) {
+                    "${date.monthValue}/${date.dayOfMonth} ${com.zju.courtgrab.core.DatePlanner.weekdayCn(date.dayOfWeek)}"
+                } else "?"
+                val exp = if (prefs.venueToken.isBlank()) null
+                else com.zju.courtgrab.alarm.JwtUtil.expiryMs(prefs.venueToken)
+                val tokenText = com.zju.courtgrab.core.PrepReminder.tokenText(
+                    prefs.venueToken, exp, System.currentTimeMillis(),
+                )
+                com.zju.courtgrab.util.Notify.showPrepReminder(
+                    context,
+                    com.zju.courtgrab.core.PrepReminder.title(dateText),
+                    com.zju.courtgrab.core.PrepReminder.body(
+                        dateText, tokenText, prefs.inviteCode.length == 5, prefs.directMode,
+                    ),
+                )
+                Logs.i("DebugTrigger", "已发送准备提醒（调试）：$dateText / $tokenText")
+            }.onFailure { Logs.w("DebugTrigger", "准备提醒失败：${it.message}") }
+            return
+        }
         val launch = Intent(context, MainActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
             putExtra("debug_action", action)
