@@ -67,6 +67,8 @@ class MainActivity : AppCompatActivity() {
     private var cfg: GrabConfig = GrabConfig.DEFAULT
     private var lastShownFinish = 0L
     private var debugOpen = false
+    /** 权限卡片展开状态：null = 自动（有缺失就展开、全绿就收起） */
+    private var permsOpen: Boolean? = null
 
     private val ui = Handler(Looper.getMainLooper())
     private val ticker = object : Runnable {
@@ -297,6 +299,11 @@ class MainActivity : AppCompatActivity() {
         }
 
         // 调试
+        b.btnTogglePerms.setOnClickListener {
+            permsOpen = b.cardPerms.visibility != View.VISIBLE
+            applyPermsVisibility()
+        }
+
         b.btnToggleDebug.setOnClickListener { toggleDebug() }
         b.btnSelfCheck.setOnClickListener { runSelfCheck() }
         b.btnDump.setOnClickListener { dumpCurrentUi() }
@@ -471,6 +478,13 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
+    /** 权限卡：默认「缺什么就展开，全绿就收起」，用户点过后尊重用户选择 */
+    private fun applyPermsVisibility() {
+        val open = permsOpen ?: true
+        b.cardPerms.visibility = if (open) View.VISIBLE else View.GONE
+        b.tvPermsArrow.text = if (open) "收起 ▴" else "展开 ▾"
+    }
+
     private fun toggleDebug() {
         debugOpen = !debugOpen
         b.layoutDebug.visibility = if (debugOpen) View.VISIBLE else View.GONE
@@ -504,6 +518,23 @@ class MainActivity : AppCompatActivity() {
         }
 
         val a11y = Perms.isA11yEnabled(this) || VenueAccessibilityService.isConnected
+        val missing = ArrayList<String>()
+        if (!a11y) missing += "无障碍"
+        if (!Perms.canScheduleExact(this)) missing += "精确闹钟"
+        if (!Perms.areNotificationsEnabled(this)) missing += "通知"
+        if (!Perms.canDrawOverlay(this)) missing += "悬浮窗"
+        if (!Perms.isIgnoringBattery(this)) missing += "电池白名单"
+        if (missing.isEmpty()) {
+            b.tvPermsSummary.text = "5/5 已就绪"
+            b.tvPermsSummary.setTextColor(getColorCompat(R.color.ok))
+            if (permsOpen == null) permsOpen = false
+        } else {
+            b.tvPermsSummary.text = "还差 ${missing.size} 项：" + missing.joinToString("/")
+            b.tvPermsSummary.setTextColor(getColorCompat(R.color.warn))
+            if (permsOpen == null) permsOpen = true
+        }
+        applyPermsVisibility()
+
         setStatus(b.tvA11yStatus, a11y, b.btnA11y)
         setStatus(b.tvAlarmPermStatus, Perms.canScheduleExact(this), b.btnAlarmPerm)
         setStatus(b.tvNotifyStatus, Perms.areNotificationsEnabled(this), b.btnNotify)

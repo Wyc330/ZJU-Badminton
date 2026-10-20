@@ -171,25 +171,53 @@
                 android:text="去处理" />
         </LinearLayout>
 
-        <!-- ═════════ 运行状态 ═════════ -->
-        <TextView
-            style="@style/CardTitle"
+        <!-- ═════════ 运行状态（可折叠） ═════════ -->
+        <LinearLayout
+            android:id="@+id/btnTogglePerms"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginStart="20dp"
             android:layout_marginTop="16dp"
-            android:layout_marginBottom="6dp"
-            android:text="运行状态" />
+            android:layout_marginEnd="20dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                style="@style/CardTitle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="运行状态" />
+
+            <TextView
+                android:id="@+id/tvPermsSummary"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/ok"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/tvPermsArrow"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:text="展开 ▾"
+                android:textColor="@color/brand"
+                android:textSize="12sp" />
+        </LinearLayout>
 
         <LinearLayout
+            android:id="@+id/cardPerms"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginStart="12dp"
+            android:layout_marginTop="6dp"
             android:layout_marginEnd="12dp"
             android:background="@drawable/bg_card_soft"
             android:orientation="vertical"
             android:paddingTop="4dp"
-            android:paddingBottom="4dp">
+            android:paddingBottom="4dp"
+            android:visibility="gone">
 
             <LinearLayout
                 android:layout_width="match_parent"
