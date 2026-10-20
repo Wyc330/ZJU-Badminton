@@ -140,5 +140,13 @@
             android:excludeFromRecents="true"
             android:noHistory="true"
             android:theme="@style/Theme.CourtGrab.Dialog" />
+        <!-- 解锁即检查：早上解锁时如果离放号不到 90 分钟，主动推清单通知 -->
+        <receiver
+            android:name=".alarm.UnlockCheckReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.USER_PRESENT" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>
