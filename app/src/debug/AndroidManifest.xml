@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!-- 仅 debug 构建存在：adb 触发调试动作的入口（release 不包含） -->
+        <receiver
+            android:name=".debug.DebugTriggerReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.zju.courtgrab.debug.TRIGGER" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

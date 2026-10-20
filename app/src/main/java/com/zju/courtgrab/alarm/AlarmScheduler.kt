@@ -24,9 +24,13 @@ import java.time.format.DateTimeFormatter
 object AlarmScheduler {
 
     const val ACTION_DAILY_FIRE = "com.zju.courtgrab.action.DAILY_FIRE"
+    const val ACTION_PREWARM = "com.zju.courtgrab.action.PREWARM"
 
     private const val TAG = "Alarm"
     private const val REQUEST_CODE = 2001
+    private const val REQUEST_CODE_PREWARM = 2002
+    /** 放号前多少分钟做预热（续期登录态） */
+    private const val PREWARM_BEFORE_MINUTES = 12L
     private val fmt: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
 
     fun nextTrigger(prefs: Prefs, now: LocalDateTime = LocalDateTime.now()): LocalDateTime {
@@ -52,6 +56,17 @@ object AlarmScheduler {
                 Logs.w(TAG, "未授予精确闹钟权限，使用非精确闹钟（可能被延迟）")
             }
             Logs.i(TAG, "已排下一次触发：${fmt.format(next)}（精确=$exact）")
+            runCatching {
+                val prewarmMillis = millis - PREWARM_BEFORE_MINUTES * 60_000
+                if (prewarmMillis > System.currentTimeMillis()) {
+                    if (exact) {
+                        am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, prewarmMillis, prewarmIntent(context))
+                    } else {
+                        am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, prewarmMillis, prewarmIntent(context))
+                    }
+                    Logs.i(TAG, "已排预热：${fmt.format(next.minusMinutes(PREWARM_BEFORE_MINUTES))}")
+                }
+            }
             true
         }.getOrElse {
             Logs.e(TAG, "排闹钟失败", it)
@@ -63,9 +78,17 @@ object AlarmScheduler {
         val am = context.getSystemService(AlarmManager::class.java) ?: return
         runCatching {
             am.cancel(pendingIntent(context))
+            am.cancel(prewarmIntent(context))
             Logs.i(TAG, "已取消定时")
         }
     }
+
+    private fun prewarmIntent(context: Context): PendingIntent = PendingIntent.getBroadcast(
+        context.applicationContext,
+        REQUEST_CODE_PREWARM,
+        Intent(context, PrewarmReceiver::class.java).setAction(ACTION_PREWARM),
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+    )
 
     /** 给界面/日志用的一句话描述 */
     fun describeNext(prefs: Prefs): String {

@@ -61,6 +61,16 @@ class Prefs private constructor(context: Context) {
         get() = sp.getString("tap_cache_json", "").orEmpty()
         set(v) = sp.edit().putString("tap_cache_json", v).apply()
 
+    /** 想带的同伴姓名（留空 = 第一个同伴）；界面里可改，优先于配置文件 */
+    var companionName: String
+        get() = sp.getString("companion_name", "").orEmpty()
+        set(v) = sp.edit().putString("companion_name", v).apply()
+
+    /** 上次静默续期尝试时间（避免反复拉起） */
+    var lastSilentRefreshAt: Long
+        get() = sp.getLong("last_silent_refresh_at", 0L)
+        set(v) = sp.edit().putLong("last_silent_refresh_at", v).apply()
+
     /** 直连下单模式（在 App 内登录场馆系统后，09:00:00 直接调接口，失败自动回退界面流程） */
     var directMode: Boolean
         get() = sp.getBoolean("direct_mode", false)

@@ -2,16 +2,18 @@ package com.zju.courtgrab
 
 import android.Manifest
 import android.content.Intent
+import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.text.Editable
-import android.text.InputType
 import android.text.TextWatcher
+import android.view.Gravity
 import android.view.View
+import android.view.ViewGroup
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
-import com.zju.courtgrab.direct.VenueLoginActivity
-import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.NumberPicker
 import android.widget.TextView
@@ -34,19 +36,25 @@ import com.zju.courtgrab.core.GrabConfig
 import com.zju.courtgrab.core.Logs
 import com.zju.courtgrab.core.Prefs
 import com.zju.courtgrab.databinding.ActivityMainBinding
+import com.zju.courtgrab.direct.DirectBookingFlow
+import com.zju.courtgrab.direct.VenueLoginActivity
 import com.zju.courtgrab.service.GrabForegroundService
 import com.zju.courtgrab.util.Perms
 import kotlinx.coroutines.launch
+import org.json.JSONObject
 import java.io.File
+import java.text.SimpleDateFormat
+import java.time.Duration
 import java.time.LocalDateTime
+import java.util.Date
+import java.util.Locale
 
 /**
  * 主界面：
+ *  · 顶部：下次触发倒计时 + 目标日期
  *  · 权限一览 + 一键跳转（无障碍 / 精确闹钟 / 通知 / 悬浮窗 / 电池 / MIUI 自启动）
- *  · 每日触发时间、开关、本次同伴码
- *  · 立即试跑 / 停止
- *  · 调试工具：抓取当前界面节点树、分享、导出/重载配置、日期预览
- *  · 实时日志
+ *  · 本次任务：触发时间、开关、时间段、同伴姓名、同伴码、演练、直连
+ *  · 立即试跑 / 停止；直连自检；调试工具（可折叠）；实时日志
  */
 class MainActivity : AppCompatActivity() {
 
@@ -55,10 +63,18 @@ class MainActivity : AppCompatActivity() {
     }
 
     private lateinit var b: ActivityMainBinding
-    /** 已经弹过提示的流程结束时间，避免重复弹 */
-    private var lastShownFinish = 0L
     private lateinit var prefs: Prefs
     private var cfg: GrabConfig = GrabConfig.DEFAULT
+    private var lastShownFinish = 0L
+    private var debugOpen = false
+
+    private val ui = Handler(Looper.getMainLooper())
+    private val ticker = object : Runnable {
+        override fun run() {
+            runCatching { refreshLive() }
+            ui.postDelayed(this, 1000L)
+        }
+    }
 
     private val notifPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { refreshStatus() }
@@ -76,21 +92,84 @@ class MainActivity : AppCompatActivity() {
         collectFlowState()
         maybeAskNotificationPermission()
         Logs.i(TAG, "主界面已打开，无障碍已连接=${VenueAccessibilityService.isConnected}")
+        handleDebugAction(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleDebugAction(intent)
+    }
+
+    /** 仅 debug 构建通过 adb 广播触发（见 DebugTriggerReceiver），方便无人值守真机调试 */
+    private fun handleDebugAction(intent: Intent?) {
+        val action = intent?.getStringExtra("debug_action").orEmpty()
+        if (action.isEmpty()) return
+        Logs.i(TAG, "调试动作：$action")
+        ui.postDelayed({
+            when (action) {
+                "selfcheck" -> runSelfCheck()
+                "start" -> startNow()
+                "login" -> startActivity(Intent(this, VenueLoginActivity::class.java))
+                "dryrun_on" -> { prefs.dryRun = true; b.cbDryRun.isChecked = true; toast("演练模式：开") }
+                "dryrun_off" -> { prefs.dryRun = false; b.cbDryRun.isChecked = false; toast("演练模式：关") }
+                "direct_on" -> { prefs.directMode = true; b.cbDirectMode.isChecked = true; renderDirectStatus() }
+                "direct_off" -> { prefs.directMode = false; b.cbDirectMode.isChecked = false; renderDirectStatus() }
+                "prewarm_silent" -> startActivity(
+                    Intent(this, VenueLoginActivity::class.java)
+                        .putExtra(VenueLoginActivity.EXTRA_SILENT, true),
+                )
+            }
+        }, 800)
     }
 
     override fun onResume() {
         super.onResume()
+        cfg = ConfigRepo.load(this)
         b.cbDirectMode.isChecked = prefs.directMode
-        renderDirectStatus()
         refreshStatus()
         refreshNextRun()
         refreshConfigPath()
+        ui.removeCallbacks(ticker)
+        ui.post(ticker)
+        maybeSilentRefresh()
+    }
+
+    /**
+     * 登录态只有 4 小时：直连模式下若剩余不足 45 分钟，悄悄拉一次静默续期
+     * （每隔 30 分钟最多一次，不打扰用户；CAS 会话还在就能免密续上）。
+     */
+    private fun maybeSilentRefresh() {
+        if (!prefs.directMode) return
+        val token = prefs.venueToken
+        if (token.isBlank()) return
+        val exp = jwtExpiry(token)
+        val remainMs = (exp ?: return) - System.currentTimeMillis()
+        if (remainMs > 45 * 60_000L) return
+        val now = System.currentTimeMillis()
+        if (now - prefs.lastSilentRefreshAt < 30 * 60_000L) return
+        prefs.lastSilentRefreshAt = now
+        Logs.i(TAG, "登录态剩余 ${remainMs / 60000} 分钟，自动尝试静默续期")
+        startActivity(
+            Intent(this, VenueLoginActivity::class.java)
+                .putExtra(VenueLoginActivity.EXTRA_SILENT, true),
+        )
+    }
+
+    override fun onPause() {
+        ui.removeCallbacks(ticker)
+        super.onPause()
+    }
+
+    override fun onDestroy() {
+        ui.removeCallbacks(ticker)
+        super.onDestroy()
     }
 
     // ───────────────────────── UI 绑定 ─────────────────────────
 
     private fun bindUi() {
-        // 同伴码
+        // 同伴码（一次性）
         b.etInviteCode.setText(prefs.inviteCode)
         b.etInviteCode.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, a: Int, bb: Int, c: Int) = Unit
@@ -105,19 +184,23 @@ class MainActivity : AppCompatActivity() {
                 prefs.inviteCode = digits
             }
         })
-
-        // 同伴码是一次性的（同伴在「我的同伴码」生成，用后作废），记住只会用错码，所以强制关闭并隐藏
         prefs.rememberCode = false
-        b.cbRememberCode.isChecked = false
-        b.cbRememberCode.visibility = android.view.View.GONE
+
+        // 同伴姓名（留空=第一个同伴）
+        b.etCompanionName.setText(prefs.companionName)
+        b.etCompanionName.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, a: Int, bb: Int, c: Int) = Unit
+            override fun onTextChanged(s: CharSequence?, a: Int, bb: Int, c: Int) = Unit
+            override fun afterTextChanged(s: Editable?) {
+                prefs.companionName = s?.toString()?.trim().orEmpty()
+            }
+        })
 
         b.cbDryRun.isChecked = prefs.dryRun
         b.cbDryRun.setOnCheckedChangeListener { _, checked -> prefs.dryRun = checked }
 
-        // 「想预约的时间段」下拉框（任意场地，按时段优先）
         setupSlotTimeSpinner()
 
-        // 直连下单模式（极速；失败自动回退界面流程）
         b.cbDirectMode.isChecked = prefs.directMode
         b.cbDirectMode.setOnCheckedChangeListener { _, checked ->
             prefs.directMode = checked
@@ -125,7 +208,20 @@ class MainActivity : AppCompatActivity() {
             renderDirectStatus()
         }
         b.btnVenueLogin.setOnClickListener {
-            startActivity(android.content.Intent(this, VenueLoginActivity::class.java))
+            startActivity(Intent(this, VenueLoginActivity::class.java))
+        }
+        b.btnRefreshToken.setOnClickListener {
+            Logs.i(TAG, "手动触发静默续期")
+            startActivity(
+                Intent(this, VenueLoginActivity::class.java)
+                    .putExtra(VenueLoginActivity.EXTRA_SILENT, true),
+            )
+        }
+        b.btnClearToken.setOnClickListener {
+            prefs.venueToken = ""
+            prefs.venueTokenAt = 0L
+            renderDirectStatus()
+            toast("已清除场馆登录态")
         }
         renderDirectStatus()
 
@@ -155,9 +251,12 @@ class MainActivity : AppCompatActivity() {
         b.btnStop.setOnClickListener { stopFlow() }
 
         // 调试
+        b.btnToggleDebug.setOnClickListener { toggleDebug() }
+        b.btnSelfCheck.setOnClickListener { runSelfCheck() }
         b.btnDump.setOnClickListener { dumpCurrentUi() }
         b.btnDumpDelayed.setOnClickListener { dumpDelayed() }
         b.btnShareDump.setOnClickListener { shareLastDump() }
+        b.btnShareLog.setOnClickListener { shareLog() }
         b.btnExportConfig.setOnClickListener { exportConfig() }
         b.btnReloadConfig.setOnClickListener { reloadConfig() }
         b.btnTestDate.setOnClickListener { previewDates() }
@@ -169,18 +268,117 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /** 显示直连模式登录态（脱敏） */
-    private fun renderDirectStatus() {
-        val token = prefs.venueToken
-        val whenText = if (prefs.venueTokenAt > 0) {
-            java.text.SimpleDateFormat("MM-dd HH:mm", java.util.Locale.CHINA)
-                .format(java.util.Date(prefs.venueTokenAt))
-        } else ""
-        b.tvDirectStatus.text = when {
-            token.isBlank() -> "直连：未登录场馆系统（点下方按钮登录一次）"
-            else -> "直连：已登录（${token.take(6)}…${token.takeLast(4)}，$whenText）"
+    private fun toggleDebug() {
+        debugOpen = !debugOpen
+        b.layoutDebug.visibility = if (debugOpen) View.VISIBLE else View.GONE
+        b.tvDebugArrow.text = if (debugOpen) "收起 ▴" else "展开 ▾"
+    }
+
+    // ───────────────────────── 状态刷新 ─────────────────────────
+
+    private fun refreshLive() {
+        val now = LocalDateTime.now()
+        val trigger = now.toLocalDate().atTime(prefs.alarmHour, prefs.alarmMinute, prefs.alarmSecond)
+        val next = if (now.isBefore(trigger)) trigger else trigger.plusDays(1)
+        val d = Duration.between(now, next)
+        b.tvCountdown.text = String.format(
+            Locale.CHINA, "%02d:%02d:%02d", d.toHours(), d.toMinutesPart(), d.toSecondsPart(),
+        )
+        b.tvNextRun.text = if (prefs.enabled) {
+            "每日 %s · 到点自动运行".format(
+                String.format(Locale.CHINA, "%02d:%02d:%02d", prefs.alarmHour, prefs.alarmMinute, prefs.alarmSecond),
+            )
+        } else {
+            "每日自动：未启用"
+        }
+
+        val target = DatePlanner.resolveTargetDate(now, cfg.dateCfg, prefs.alarmHour, prefs.alarmMinute)
+        b.tvTargetDate.text = if (target != null) {
+            String.format(Locale.CHINA, "%d/%d ", target.monthValue, target.dayOfMonth) +
+                DatePlanner.weekdayCn(target.dayOfWeek)
+        } else {
+            "--"
+        }
+
+        val a11y = Perms.isA11yEnabled(this) || VenueAccessibilityService.isConnected
+        setStatus(b.tvA11yStatus, a11y, b.btnA11y)
+        setStatus(b.tvAlarmPermStatus, Perms.canScheduleExact(this), b.btnAlarmPerm)
+        setStatus(b.tvNotifyStatus, Perms.areNotificationsEnabled(this), b.btnNotify)
+        setStatus(b.tvOverlayStatus, Perms.canDrawOverlay(this), b.btnOverlay)
+        setStatus(b.tvBatteryStatus, Perms.isIgnoringBattery(this), b.btnBattery)
+
+        renderDirectStatus()
+    }
+
+    private fun refreshStatus() = refreshLive()
+
+    private fun setStatus(tv: TextView, ok: Boolean, button: android.widget.Button? = null) {
+        tv.text = if (ok) "已开启" else "未开启"
+        tv.setTextColor(getColorCompat(if (ok) R.color.ok else R.color.bad))
+        button?.text = if (ok) "去设置" else "去开启"
+    }
+
+    private fun getColorCompat(id: Int): Int =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) getColor(id)
+        else resources.getColor(id, theme)
+
+    private fun refreshNextRun() {
+        b.tvAlarmTime.text = String.format(
+            Locale.CHINA, "%02d:%02d:%02d", prefs.alarmHour, prefs.alarmMinute, prefs.alarmSecond,
+        )
+        refreshLive()
+    }
+
+    private fun refreshConfigPath() {
+        runCatching {
+            b.tvConfigPath.text = "配置文件：${ConfigRepo.externalConfigFile(this).absolutePath}\n" +
+                "日志文件：${Logs.filePath() ?: "-"}"
         }
     }
+
+    /** 显示直连登录态：已登录 / 过期 / 未登录（脱敏） */
+    private fun renderDirectStatus() {
+        val token = prefs.venueToken
+        if (token.isBlank()) {
+            b.tvDirectStatus.text = "直连：未登录（点「登录场馆系统」登录一次）"
+            b.tvDirectStatus.setTextColor(getColorCompat(R.color.text_secondary))
+            return
+        }
+        val expMs = jwtExpiry(token)
+        val loginAt = if (prefs.venueTokenAt > 0) {
+            SimpleDateFormat("MM-dd HH:mm", Locale.CHINA).format(Date(prefs.venueTokenAt))
+        } else ""
+        when {
+            expMs != null && expMs < System.currentTimeMillis() -> {
+                b.tvDirectStatus.text = "直连：⚠️ 登录态已过期（${SimpleDateFormat("MM-dd HH:mm", Locale.CHINA).format(Date(expMs))}），请重新登录"
+                b.tvDirectStatus.setTextColor(getColorCompat(R.color.bad))
+            }
+            expMs != null -> {
+                val remainMin = (expMs - System.currentTimeMillis()) / 60_000
+                val warn = if (remainMin < 45) "（即将过期，点「自动续期」）" else ""
+                b.tvDirectStatus.text = "直连：已登录 · 有效至 " +
+                    SimpleDateFormat("MM-dd HH:mm", Locale.CHINA).format(Date(expMs)) +
+                    "（剩余 ${remainMin} 分钟）$warn"
+                b.tvDirectStatus.setTextColor(getColorCompat(if (remainMin < 45) R.color.warn else R.color.ok))
+            }
+            else -> {
+                b.tvDirectStatus.text = "直连：已登录（${token.take(6)}…${token.takeLast(4)}，$loginAt）"
+                b.tvDirectStatus.setTextColor(getColorCompat(R.color.ok))
+            }
+        }
+    }
+
+    /** 解析 JWT 的 exp（毫秒）；不是 JWT 时返回 null */
+    private fun jwtExpiry(token: String): Long? = runCatching {
+        val parts = token.split(".")
+        if (parts.size < 2) return@runCatching null
+        val payload = android.util.Base64.decode(
+            parts[1],
+            android.util.Base64.URL_SAFE or android.util.Base64.NO_PADDING or android.util.Base64.NO_WRAP,
+        )
+        val exp = JSONObject(String(payload, Charsets.UTF_8)).optLong("exp", 0L)
+        if (exp > 0) exp * 1000 else null
+    }.getOrNull()
 
     /** 时间段下拉框：保存到 Prefs，抢场地时按它优先选那一行（场地号随意） */
     private fun setupSlotTimeSpinner() {
@@ -207,13 +405,9 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /**
-     * 打开无障碍设置前先弹一次手动路径。
-     * 实测部分 HyperOS 机型上直接跳 ACTION_ACCESSIBILITY_SETTINGS 会落到 WLAN 设置页，
-     * 所以把「设置 → 无障碍 → 已下载的服务」这条路径明确写给用户，跳错了也能自己走。
-     */
+    /** 打开无障碍设置前先弹一次手动路径 */
     private fun openA11yWithGuide() {
-        if (Perms.isA11yEnabled(this)) {
+        if (Perms.isA11yEnabled(this) || VenueAccessibilityService.isConnected) {
             toast("无障碍服务已开启")
             refreshStatus()
             return
@@ -224,42 +418,11 @@ class MainActivity : AppCompatActivity() {
                 "手动路径：\n设置 → 更多设置 / 无障碍 → 已下载的服务（部分机型叫「已安装的服务」）" +
                     " → 「抢场地 · 自动预约助手」→ 开启\n\n" +
                     "如果点「去设置」跳到了别的页面（部分 HyperOS 会误跳到 WLAN），" +
-                    "请回到桌面按上面的路径手动进入；开启后回到本页会自动刷新状态。"
+                    "请回到桌面按上面的路径手动进入；开启后回到本页会自动刷新状态。",
             )
             .setPositiveButton("去设置") { _, _ -> Perms.openA11ySettings(this) }
             .setNegativeButton("取消", null)
             .show()
-    }
-
-    // ───────────────────────── 状态刷新 ─────────────────────────
-
-    private fun refreshStatus() {
-        setStatus(b.tvA11yStatus, Perms.isA11yEnabled(this))
-        setStatus(b.tvAlarmPermStatus, Perms.canScheduleExact(this))
-        setStatus(b.tvNotifyStatus, Perms.areNotificationsEnabled(this))
-        setStatus(b.tvOverlayStatus, Perms.canDrawOverlay(this))
-        setStatus(b.tvBatteryStatus, Perms.isIgnoringBattery(this))
-    }
-
-    private fun setStatus(tv: TextView, ok: Boolean) {
-        tv.text = if (ok) "已开启" else "未开启"
-        tv.setTextColor(getColorCompat(if (ok) R.color.ok else R.color.bad))
-    }
-
-    private fun getColorCompat(id: Int): Int =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) getColor(id)
-        else resources.getColor(id, theme)
-
-    private fun refreshNextRun() {
-        b.tvAlarmTime.text = String.format("%02d:%02d:%02d", prefs.alarmHour, prefs.alarmMinute, prefs.alarmSecond)
-        b.tvNextRun.text = "下次触发：" + AlarmScheduler.describeNext(prefs)
-    }
-
-    private fun refreshConfigPath() {
-        runCatching {
-            b.tvConfigPath.text = "配置文件：${ConfigRepo.externalConfigFile(this).absolutePath}\n" +
-                "日志文件：${Logs.filePath() ?: "-"}"
-        }
     }
 
     private fun maybeAskNotificationPermission(request: Boolean = false) {
@@ -276,7 +439,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun warnIfPermissionsMissing() {
         val missing = ArrayList<String>()
-        if (!Perms.isA11yEnabled(this)) missing += "无障碍服务"
+        if (!Perms.isA11yEnabled(this) && !VenueAccessibilityService.isConnected) missing += "无障碍服务"
         if (!Perms.canScheduleExact(this)) missing += "精确闹钟"
         if (!Perms.areNotificationsEnabled(this)) missing += "通知"
         if (!Perms.canDrawOverlay(this)) missing += "悬浮窗（后台拉起需要）"
@@ -300,7 +463,7 @@ class MainActivity : AppCompatActivity() {
         fun picker(max: Int, value: Int, label: String): NumberPicker {
             val col = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
-                gravity = android.view.Gravity.CENTER_HORIZONTAL
+                gravity = Gravity.CENTER_HORIZONTAL
             }
             val np = NumberPicker(this).apply {
                 minValue = 0
@@ -313,8 +476,8 @@ class MainActivity : AppCompatActivity() {
                 TextView(this).apply {
                     text = label
                     textSize = 12f
-                    gravity = android.view.Gravity.CENTER
-                }
+                    gravity = Gravity.CENTER
+                },
             )
             container.addView(col, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
             return np
@@ -325,7 +488,7 @@ class MainActivity : AppCompatActivity() {
         val secP = picker(59, prefs.alarmSecond, "秒")
 
         AlertDialog.Builder(this)
-            .setTitle("每日触发时间（建议 07:59:55，抢整点前几秒）")
+            .setTitle("每日触发时间（建议 08:59:45，放号前十几秒）")
             .setView(container)
             .setPositiveButton("保存") { _, _ ->
                 prefs.alarmHour = hourP.value
@@ -345,7 +508,7 @@ class MainActivity : AppCompatActivity() {
     // ───────────────────────── 任务操作 ─────────────────────────
 
     private fun startNow() {
-        if (!Perms.isA11yEnabled(this)) {
+        if (!Perms.isA11yEnabled(this) && !VenueAccessibilityService.isConnected) {
             toast("请先开启无障碍服务")
             Perms.openA11ySettings(this)
             return
@@ -356,7 +519,10 @@ class MainActivity : AppCompatActivity() {
             return
         }
         if (code.length == 5) prefs.inviteCode = code
-        Logs.i(TAG, "手动试跑（同伴码=${if (code.length == 5) "已填" else "未填，流程中会弹窗要"}）")
+        Logs.i(
+            TAG,
+            "手动试跑（同伴=${b.etCompanionName.text.ifBlank { "默认" }}，同伴码=${if (code.length == 5) "已填" else "未填，流程中会弹窗要"}，直连=${prefs.directMode}）",
+        )
         toast("开始试跑：请保持屏幕常亮、不要操作手机")
         GrabForegroundService.startFire(this)
     }
@@ -369,6 +535,17 @@ class MainActivity : AppCompatActivity() {
         }
         svc.stopFlow("主界面手动停止")
         toast("已请求停止")
+    }
+
+    /** 直连自检：验证登录态 / 场馆 / 解析 / 同伴 */
+    private fun runSelfCheck() {
+        toast("正在自检…")
+        lifecycleScope.launch {
+            val text = runCatching { DirectBookingFlow.selfCheck(prefs, cfg) }
+                .getOrElse { "自检异常：${it.message}" }
+            Logs.i(TAG, "直连自检：\n$text")
+            showTextDialog("直连自检结果", text)
+        }
     }
 
     // ───────────────────────── 调试工具 ─────────────────────────
@@ -392,16 +569,11 @@ class MainActivity : AppCompatActivity() {
                 "抓取完成（${result.nodeCount} 个节点）",
                 "JSON：\n${result.json.absolutePath}\n\nTXT：\n${result.text.absolutePath}\n\n" +
                     "界面文字：\n${svc.ops.visibleTextDigest(40)}\n\n" +
-                    "可点节点：\n${svc.ops.clickableDigest(20)}\n\n" +
-                    "把 TXT 发给我，就能把 viewId / text 抄进配置。",
+                    "可点节点：\n${svc.ops.clickableDigest(20)}",
             )
         }
     }
 
-    /**
-     * 延时抓取：无障碍只能看到「当前可见」的窗口。
-     * 所以先点这个按钮，然后 5 秒内切到浙大体艺的目标页面，服务会在那边抓。
-     */
     private fun dumpDelayed() {
         val svc = VenueAccessibilityService.instance
         if (svc == null) {
@@ -419,14 +591,27 @@ class MainActivity : AppCompatActivity() {
             toast("还没有抓取结果，先点「抓取当前界面节点树」")
             return
         }
+        shareFile(File(path), "application/json", "分享抓取结果")
+    }
+
+    private fun shareLog() {
+        val path = Logs.filePath()
+        if (path.isNullOrEmpty() || !File(path).exists()) {
+            toast("还没有日志文件")
+            return
+        }
+        shareFile(File(path), "text/plain", "分享运行日志")
+    }
+
+    private fun shareFile(file: File, mime: String, title: String) {
         runCatching {
-            val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", File(path))
+            val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
             val send = Intent(Intent.ACTION_SEND).apply {
-                type = "application/json"
+                type = mime
                 putExtra(Intent.EXTRA_STREAM, uri)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
-            startActivity(Intent.createChooser(send, "分享抓取结果"))
+            startActivity(Intent.createChooser(send, title))
         }.onFailure { toast("分享失败：${it.message}") }
     }
 
@@ -441,9 +626,10 @@ class MainActivity : AppCompatActivity() {
                         "最可能要改的键：\n" +
                         "· entryService / entryBooking —— 场馆服务、场馆预约的入口文案\n" +
                         "· venueFengYu / venueBadminton —— 风雨操场、羽毛球场文案\n" +
-                        "· timeSlots —— 时段节点的正则\n" +
-                        "· btnBookNow / noticeItem / btnSubmitOrder —— 我要预约、通报信息、提交订单\n" +
-                        "· dateCfg.weekdayPriority —— 日期优先级（默认 FRI→SAT→SUN）\n" +
+                        "· dateCfg.useNextReleaseDate / releaseDaysAhead —— 目标日期策略（默认待开票最近一天）\n" +
+                        "· preferredSlotStart —— 想预约的时间段\n" +
+                        "· directVenueName / directVenueSiteId —— 直连时匹配的场馆\n" +
+                        "· directMaxWaitMs / directPollMinMs —— 直连轮询时长与间隔\n" +
                         "· codeInput / btnConfirm —— 同伴码输入框与确定按钮",
                 )
             }.onFailure { toast("导出失败：${it.message}") }
@@ -458,15 +644,19 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun previewDates() {
-        val text = DatePlanner.preview(LocalDateTime.now(), cfg.dateCfg)
-        showTextDialog(
-            "目标日期优先级（按今天算）",
-            "会按这个顺序尝试：\n\n$text\n\n" +
-                "说明：预约页用左右箭头切日期，窗口实测是「今天 + 2 天」。" +
-                "App 会从今天开始按上面的优先级挑，切不过去就说明超出窗口。\n\n" +
-                "周五会只挑下午时段（dateCfg.fridayAfternoonOnly=true）；" +
-                "窗口内没有周五/六/日时本次不抢（requirePreferredWeekday）。",
-        )
+        val now = LocalDateTime.now()
+        val target = DatePlanner.resolveTargetDate(now, cfg.dateCfg, prefs.alarmHour, prefs.alarmMinute)
+        val text = buildString {
+            appendLine("现在：${Logs.fullTime()}")
+            appendLine("目标日期：${target ?: "算不出"} ${target?.let { "（${DatePlanner.weekdayCn(it.dayOfWeek)}）" } ?: ""}")
+            appendLine()
+            appendLine("规则：每天 09:00 放「后天」的号")
+            appendLine("· 09:00 前触发 → 今天+2")
+            appendLine("· 09:00 后触发 → 明天+2")
+            appendLine()
+            appendLine("如需退回按星期优先级（旧逻辑），在配置里设 dateCfg.useNextReleaseDate=false")
+        }
+        showTextDialog("目标日期预览", text)
     }
 
     // ───────────────────────── 流程状态 / 完成提示 ─────────────────────────
@@ -480,12 +670,24 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun renderFlowState(st: FlowState) {
+        val (bgColor, textColor) = when {
+            st.running -> R.color.brand_light to R.color.brand_dark
+            st.success == true -> R.color.ok_light to R.color.ok
+            st.success == false -> R.color.bad_light to R.color.bad
+            else -> R.color.brand_light to R.color.text_secondary
+        }
         b.tvFlowState.text = when {
-            st.running -> "⏳ 流程运行中…（请不要切走；切走会自动把浙大体艺拉回来）"
+            st.running -> "⏳ 流程运行中…（不要切走；切走会自动把浙大体艺拉回来）"
             st.success == null -> "上次结果：还没跑过"
             st.success -> "✅ 上次成功：${st.message}"
             else -> "❌ 上次失败：${st.message}"
         }
+        b.tvFlowState.background = GradientDrawable().apply {
+            cornerRadius = 12f * resources.displayMetrics.density
+            setColor(getColorCompat(bgColor))
+        }
+        b.tvFlowState.setTextColor(getColorCompat(textColor))
+
         if (!st.running && st.success != null && st.finishedAt > lastShownFinish) {
             lastShownFinish = st.finishedAt
             refreshStatus()

@@ -4,6 +4,8 @@
          实际路径 /sdcard/Android/data/com.zju.courtgrab/files/dumps/，
          电脑上可直接 adb pull，无需 root。分享时也走这里。 -->
     <external-files-path name="dumps_ext" path="dumps/" />
+    <!-- 运行日志（files/logs/） -->
+    <files-path name="logs" path="logs/" />
     <!-- 兼容早期内部目录 -->
     <files-path name="dumps" path="dumps/" />
 </paths>

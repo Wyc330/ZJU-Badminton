@@ -123,5 +123,13 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+        <!-- 放号前 12 分钟：静默续期登录态 -->
+        <receiver
+            android:name=".alarm.PrewarmReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.zju.courtgrab.action.PREWARM" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

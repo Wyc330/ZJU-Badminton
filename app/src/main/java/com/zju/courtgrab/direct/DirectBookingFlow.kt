@@ -5,7 +5,9 @@ import com.zju.courtgrab.core.GrabConfig
 import com.zju.courtgrab.core.Logs
 import com.zju.courtgrab.core.Prefs
 import com.zju.courtgrab.core.SlotGridGeometry
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.time.LocalDateTime
@@ -63,7 +65,7 @@ object DirectBookingFlow {
         }
         Logs.i(TAG, "场馆 id = $venueSiteId")
 
-        val buddy = runCatching { pickBuddy(client, cfg) }.getOrElse {
+        val buddy = runCatching { pickBuddy(client, cfg, prefs.companionName) }.getOrElse {
             Logs.w(TAG, "查询同伴失败：${it.message}")
             null
         }
@@ -218,7 +220,7 @@ object DirectBookingFlow {
         return best
     }
 
-    private fun pickBuddy(client: VenueClient, cfg: GrabConfig): Pair<Long, Long?>? {
+    private fun pickBuddy(client: VenueClient, cfg: GrabConfig, prefsHint: String): Pair<Long, Long?>? {
         val root = client.buddies()
         var fallback: Pair<Long, Long?>? = null
         walk(root) { obj ->
@@ -230,7 +232,8 @@ object DirectBookingFlow {
                 if (obj.has("roleId")) obj.optLong("roleId") else null
             val pair = id to roleId
             if (fallback == null) fallback = pair
-            if (cfg.companionName.isNotBlank() && name.contains(cfg.companionName)) fallback = pair
+            val want = prefsHint.ifBlank { cfg.companionName }
+            if (want.isNotBlank() && name.contains(want)) fallback = pair
         }
         return fallback
     }
@@ -304,4 +307,54 @@ object DirectBookingFlow {
     }
 
     private fun String.containsAny(hints: List<String>): Boolean = hints.any { this.contains(it) }
+
+    /**
+     * 「直连自检」：在界面上一键验证 登录态 / 场馆 id / day/info 解析 / 同伴，返回人话结果。
+     * 不提交订单，可以随时点。
+     */
+    suspend fun selfCheck(prefs: Prefs, cfg: GrabConfig): String = withContext(Dispatchers.IO) {
+        val sb = StringBuilder()
+        val client = VenueClient(prefs)
+        if (!client.isLoggedIn()) {
+            return@withContext "❌ 未登录场馆系统：请先点「登录场馆系统」登录一次"
+        }
+        sb.appendLine("① 登录态：已保存（${prefs.venueToken.take(6)}…${prefs.venueToken.takeLast(4)}）")
+        val now = LocalDateTime.now()
+        val date = DatePlanner.resolveTargetDate(now, cfg.dateCfg, cfg.releaseHour, cfg.releaseMinute)
+        sb.appendLine("② 目标日期：${date ?: "算不出（检查 dateCfg）"}")
+        val venueSiteId = try {
+            resolveVenueSiteId(client, cfg)
+        } catch (e: VenueUnauthorized) {
+            return@withContext "❌ 登录态已失效，请重新登录场馆系统：${e.message}"
+        } catch (e: Throwable) {
+            return@withContext "❌ 场馆信息接口失败：${e.message}"
+        }
+        if (venueSiteId == null) {
+            return@withContext "❌ 没找到「${cfg.directVenueName}」的场馆 id：可在配置里填 directVenueSiteId"
+        }
+        sb.appendLine("③ 场馆 id：$venueSiteId（${cfg.directVenueName}）")
+        val day = try {
+            client.dayInfo(venueSiteId, date.toString())
+        } catch (e: VenueUnauthorized) {
+            return@withContext "❌ 登录态已失效，请重新登录场馆系统：${e.message}"
+        } catch (e: Throwable) {
+            return@withContext "❌ day/info 接口失败（可能还没到放号时间）：${e.message}"
+        }
+        val preferredMinute = SlotGridGeometry.parseStartMinute(prefs.preferredSlotStart.ifBlank { cfg.preferredSlotStart })
+        val row = pickTimeRow(day, preferredMinute)
+        val spaces = spaceIds(day)
+        val timeCount = day.optJSONArray("spaceTimeInfo")?.length() ?: 0
+        sb.appendLine("④ 时段数：$timeCount，选中 timeId：${row?.first ?: "未解析出"}")
+        sb.appendLine("⑤ 场地数：${spaces.size}")
+        val buddy = runCatching { pickBuddy(client, cfg, prefs.companionName) }.getOrNull()
+        sb.appendLine("⑥ 同伴：${buddy?.first ?: "未找到（界面可填同伴姓名）"}")
+        sb.appendLine("⑦ 同伴码：${if (prefs.inviteCode.length == 5) "已填 5 位" else "未填"}")
+        sb.appendLine("⑧ 演练模式：${if (prefs.dryRun) "开（不会真下单）" else "关（9:00 会真下单）"}")
+        sb.appendLine()
+        sb.appendLine(
+            if (row != null && spaces.isNotEmpty()) "✅ 直连链路可用，09:00:00 会直接下单"
+            else "⚠️ 解析异常：放号前 day/info 可能还没数据，9:00 后点自检更准"
+        )
+        sb.toString()
+    }
 }

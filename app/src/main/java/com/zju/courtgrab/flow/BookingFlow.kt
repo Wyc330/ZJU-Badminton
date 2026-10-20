@@ -98,6 +98,19 @@ class BookingFlow(
 
     // ─────────────────────────── 主流程 ───────────────────────────
 
+    /** 目标 App 当前停在哪个页面（用于跳过重复导航） */
+    private enum class PageState { BOOKING, MODULE, HOME, UNKNOWN }
+
+    private fun detectPageState(): PageState = runCatching {
+        val booking = ops.findAll(cfg.bookingPageReady)
+        if (booking.isNotEmpty()) return@runCatching PageState.BOOKING
+        val moduleEntry = ops.findAll(cfg.entryBooking)
+        val home = ops.findAll(cfg.entryService)
+        if (moduleEntry.isNotEmpty() && home.isEmpty()) return@runCatching PageState.MODULE
+        if (home.isNotEmpty()) return@runCatching PageState.HOME
+        PageState.UNKNOWN
+    }.getOrDefault(PageState.UNKNOWN)
+
     suspend fun run() {
         cfg = ConfigRepo.load(ctx)
         Logs.i(TAG, "配置摘要:\n${cfg.summary()}")
@@ -116,15 +129,30 @@ class BookingFlow(
             }
         }
 
-        step("① 启动目标 App") { launchTarget() }
-        step("② 关闭弹窗") { dismissPopups() }
-        step("③ 等待首页") { waitHome() }
-        step("④ 进入场馆服务") { clickNav("进入场馆服务", cfg.entryService, expected = cfg.entryBooking + cfg.bookingPageReady) }
-
-        step("⑤ 关闭弹窗（预约须知）") { dismissPopups() }
-        step("⑥ 进入场馆预约") { clickNav("进入场馆预约", cfg.entryBooking, expected = cfg.bookingPageReady) }
-        step("⑦ 关闭弹窗") { dismissPopups() }
-        step("⑧ 等待预约场地页") { waitBookingPage() }
+        // 智能识别当前停在哪个页面：已经到预约页就不用再跑 ①–⑧（预热/上次失败后常停在这里）
+        when (detectPageState()) {
+            PageState.BOOKING -> {
+                Log("✔ 检测到已在「预约场地」页，跳过启动与导航（①–⑧）")
+                ensureTargetForeground("确认预约页")
+            }
+            PageState.MODULE -> {
+                Log("✔ 检测到已在「场馆服务」页，只需点一次「场馆预约」")
+                ensureTargetForeground("进入场馆预约")
+                step("⑥ 进入场馆预约") { clickNav("进入场馆预约", cfg.entryBooking, expected = cfg.bookingPageReady) }
+                step("⑦ 关闭弹窗") { dismissPopups() }
+                step("⑧ 等待预约场地页") { waitBookingPage() }
+            }
+            else -> {
+                step("① 启动目标 App") { launchTarget() }
+                step("② 关闭弹窗") { dismissPopups() }
+                step("③ 等待首页") { waitHome() }
+                step("④ 进入场馆服务") { clickNav("进入场馆服务", cfg.entryService, expected = cfg.entryBooking + cfg.bookingPageReady) }
+                step("⑤ 关闭弹窗（预约须知）") { dismissPopups() }
+                step("⑥ 进入场馆预约") { clickNav("进入场馆预约", cfg.entryBooking, expected = cfg.bookingPageReady) }
+                step("⑦ 关闭弹窗") { dismissPopups() }
+                step("⑧ 等待预约场地页") { waitBookingPage() }
+            }
+        }
         step("⑨ 确认校区") { selectCampus() }
         step("⑩ 选择风雨操场") { clickSelect("选择风雨操场", cfg.venueFengYu) }
         step("⑪ 选择羽毛球场") {
@@ -172,7 +200,12 @@ class BookingFlow(
             Log("—— 候选 ${idx + 1}/${candidates.size}：$target ——")
             try {
                 val actual = stepWithResult("⑬ 切到日期 $target") { navigateToDate(target) }
-                if (actual == null) throw FlowException("切到日期", "读不出日期框内容")
+                if (actual == null) {
+                    throw FlowException(
+                        "切到日期",
+                        "读不出日期框内容（页面可能被滚走或还没到放号时间）；目标 $target",
+                    )
+                }
                 Log("实际日期 = $actual")
                 if (actual != target) Logs.w(TAG, "期望 $target，实际停在 $actual，按实际日期判断")
 
@@ -318,7 +351,8 @@ class BookingFlow(
                 if (loc.isEmpty) continue
                 val idxs = LocatorMatcher.candidateIndexes(snaps, loc)
                 if (idxs.isEmpty()) continue
-                for (idx in idxs.take(4)) {
+                val ordered = idxs.sortedByDescending { nodes[it].snap.clickable }
+                for (idx in ordered.take(4)) {
                     val h = nodes[idx]
                     if (!ops.click(h, cfg.afterClickDelayMs)) continue
                     if (expected.isEmpty()) {
@@ -444,14 +478,40 @@ class BookingFlow(
     // ─────────────────────────── 日期 ───────────────────────────
 
     private suspend fun readDisplayedDate(): LocalDate? {
-        val node = ops.waitFor(listOf(cfg.dateDisplay), 1500, 120) ?: return null
-        return DatePlanner.parseDisplayed(node.snap.text, cfg.dateCfg)
+        val node = ops.waitFor(listOf(cfg.dateDisplay), 1500, 120)
+        node?.snap?.text?.let { txt ->
+            DatePlanner.parseDisplayed(txt, cfg.dateCfg)?.let { return it }
+        }
+        // 兜底：整页找「2026-10-20」样式的文本（WebView 里日期框偶尔不在可访问区）
+        val regex = Regex("\\d{4}\\s*[-/]\\s*\\d{1,2}\\s*[-/]\\s*\\d{1,2}")
+        for (h in ops.collect()) {
+            val m = regex.find(h.snap.text ?: "") ?: continue
+            DatePlanner.parseDisplayed(m.value, cfg.dateCfg)?.let {
+                Log("  日期框兜底命中：${m.value}")
+                return it
+            }
+        }
+        return null
+    }
+
+    /** 页面被滚到下面（比如刚勾过同意）时，先滚回顶部让日期框可见 */
+    private suspend fun scrollPageToTop(times: Int = 2) {
+        repeat(times) {
+            ops.swipe(screenW * 0.5f, screenH * 0.30f, screenW * 0.5f, screenH * 0.80f, 260)
+            delay(280)
+        }
     }
 
     /** 用 `<`/`>` 箭头把日期移动到 target；返回最终停在哪天 */
     private suspend fun navigateToDate(target: LocalDate): LocalDate? {
         ensureTargetForeground("切换日期")
-        var current = readDisplayedDate() ?: return null
+        var current = readDisplayedDate()
+        if (current == null) {
+            Log("  日期框不在可视区，先滚回顶部")
+            scrollPageToTop()
+            current = readDisplayedDate()
+        }
+        if (current == null) return null
         if (current == target) {
             Log("日期已经是 $target")
             return current
@@ -486,6 +546,12 @@ class BookingFlow(
                 }
             }
             if (!fixed) {
+                scrollPageToTop(1)
+                val a3 = readDisplayedDate()
+                if (a3 != null && a3 != current) {
+                    current = a3
+                    continue
+                }
                 Log("箭头没生效（当前 $current），可能已到预约窗口边界")
                 break
             }
@@ -899,8 +965,9 @@ class BookingFlow(
         }
 
         // 1) 选同伴
-        val explicit = if (cfg.companionName.isNotBlank()) {
-            ops.waitFor(listOf(Locator(textContains = cfg.companionName)), 2500, 150)
+        val wantName = prefs.companionName.ifBlank { cfg.companionName }
+        val explicit = if (wantName.isNotBlank()) {
+            ops.waitFor(listOf(Locator(textContains = wantName)), 2500, 150)
         } else null
 
         cachedPoint("companion")?.let { p ->
