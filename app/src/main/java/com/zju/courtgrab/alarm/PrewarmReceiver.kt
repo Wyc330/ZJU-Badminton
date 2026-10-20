@@ -52,6 +52,42 @@ class PrewarmReceiver : BroadcastReceiver() {
             )
         }.onFailure { Logs.w(TAG, "准备提醒失败：${it.message}") }
 
+        // ② 锁屏检查：安全锁屏无法由应用代解，9:00 流程会卡在拉起目标 App
+        runCatching {
+            val km = context.getSystemService(android.app.KeyguardManager::class.java)
+            if (km != null && km.isKeyguardLocked) {
+                Logs.w(TAG, "手机处于锁屏状态，尝试自动解锁（非安全锁屏可解）")
+                runCatching {
+                    context.startActivity(
+                        Intent(context, com.zju.courtgrab.ui.UnlockActivity::class.java)
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                    )
+                }
+                Notify.showPrepReminder(
+                    context,
+                    "请解锁手机",
+                    "9:00 自动抢场地需要手机处于解锁状态（安全锁屏应用无法代解）。" +
+                        "请现在解锁一次；解锁后到 9 点之间不会再自动锁回去。",
+                )
+            } else {
+                Logs.i(TAG, "屏幕已解锁")
+            }
+        }.onFailure { Logs.w(TAG, "锁屏检查失败：${it.message}") }
+
+        // ③ 无障碍检查：夜间被系统/手机管家杀掉的话，早上流程会直接失败，提前提醒用户重开
+        runCatching {
+            if (!com.zju.courtgrab.util.Perms.isA11yEnabled(context)) {
+                Logs.w(TAG, "无障碍服务未开启，提醒用户")
+                Notify.showPrepReminder(
+                    context,
+                    "无障碍服务未开启",
+                    "今天的自动抢场地需要无障碍服务：打开「抢场地」→「运行状态」→「去开启」，开好后回来即可。",
+                )
+            } else {
+                Logs.i(TAG, "无障碍服务状态正常")
+            }
+        }.onFailure { Logs.w(TAG, "无障碍检查失败：${it.message}") }
+
         if (!prefs.directMode) {
             Logs.i(TAG, "没开直连模式，只发提醒不续期")
             return

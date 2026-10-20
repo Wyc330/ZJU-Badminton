@@ -133,5 +133,12 @@
                 <action android:name="com.zju.courtgrab.action.PREWARM" />
             </intent-filter>
         </receiver>
+        <!-- 透明解锁页：无人值守时解除非安全锁屏 -->
+        <activity
+            android:name=".ui.UnlockActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@style/Theme.CourtGrab.Dialog" />
     </application>
 </manifest>

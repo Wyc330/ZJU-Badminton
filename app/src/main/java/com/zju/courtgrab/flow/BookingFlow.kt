@@ -270,6 +270,14 @@ class BookingFlow(
     // ─────────────────────────── 前置 ───────────────────────────
 
     private suspend fun launchTarget() {
+        // 锁屏时先把非安全锁屏解除，否则目标 App 起不来（安全锁屏只能用户本人解锁）
+        runCatching {
+            ctx.startActivity(
+                android.content.Intent(ctx, com.zju.courtgrab.ui.UnlockActivity::class.java)
+                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_NO_ANIMATION),
+            )
+            delay(900)
+        }
         if (ops.foregroundPackage() == cfg.targetPackage) {
             Log("目标 App 已在前台")
             return

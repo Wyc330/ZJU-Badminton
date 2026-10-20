@@ -759,6 +759,13 @@
                 android:text="分享最近一次抓取" />
 
             <Button
+                android:id="@+id/btnShareDiag"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="分享诊断信息（一键打包）" />
+
+            <Button
                 android:id="@+id/btnShareLog"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

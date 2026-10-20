@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import com.zju.courtgrab.MainActivity
 import com.zju.courtgrab.core.Logs
+import kotlinx.coroutines.launch
 
 /**
  * 仅 debug 构建：允许通过 adb 广播触发调试动作，便于在真机上无人值守地跑流程。
@@ -16,6 +17,30 @@ class DebugTriggerReceiver : BroadcastReceiver() {
         val action = intent.getStringExtra("action").orEmpty()
         Logs.init(context)
         Logs.i("DebugTrigger", "收到调试动作：$action")
+
+        // 解锁 / 静默自检：不拉起主界面
+        if (action == "unlock") {
+            runCatching {
+                context.startActivity(
+                    android.content.Intent(context, com.zju.courtgrab.ui.UnlockActivity::class.java)
+                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                )
+                Logs.i("DebugTrigger", "已请求解锁页")
+            }.onFailure { Logs.w("DebugTrigger", "解锁请求失败：${it.message}") }
+            return
+        }
+        if (action == "selfcheck_log") {
+            runCatching {
+                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                    val prefs = com.zju.courtgrab.core.Prefs.get(context)
+                    val cfg = com.zju.courtgrab.core.ConfigRepo.load(context)
+                    val result = com.zju.courtgrab.direct.DirectBookingFlow.selfCheck(prefs, cfg)
+                    Logs.i("DebugTrigger", "自检结果：" + result.lineSequence().joinToString(" | "))
+                }
+                Logs.i("DebugTrigger", "已触发静默自检")
+            }.onFailure { Logs.w("DebugTrigger", "静默自检失败：${it.message}") }
+            return
+        }
 
         // 开关类调试动作：直接在 receiver 内完成，不拉起界面
         if (action in setOf("enable_on", "enable_off", "dryrun_on", "dryrun_off")) {

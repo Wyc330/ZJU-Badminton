@@ -39,6 +39,7 @@ import com.zju.courtgrab.databinding.ActivityMainBinding
 import com.zju.courtgrab.direct.DirectBookingFlow
 import com.zju.courtgrab.direct.VenueLoginActivity
 import com.zju.courtgrab.service.GrabForegroundService
+import com.zju.courtgrab.util.Diag
 import com.zju.courtgrab.util.Perms
 import kotlinx.coroutines.launch
 import org.json.JSONObject
@@ -310,6 +311,7 @@ class MainActivity : AppCompatActivity() {
         b.btnDumpDelayed.setOnClickListener { dumpDelayed() }
         b.btnShareDump.setOnClickListener { shareLastDump() }
         b.btnShareLog.setOnClickListener { shareLog() }
+        b.btnShareDiag.setOnClickListener { shareDiagnostics() }
         b.btnExportConfig.setOnClickListener { exportConfig() }
         b.btnReloadConfig.setOnClickListener { reloadConfig() }
         b.btnTestDate.setOnClickListener { previewDates() }
@@ -826,6 +828,16 @@ class MainActivity : AppCompatActivity() {
             return
         }
         shareFile(File(path), "application/json", "分享抓取结果")
+    }
+
+    /** 一键打包诊断信息（版本/开关/登录态脱敏/闹钟/上次结果/配置/日志尾）并分享 */
+    private fun shareDiagnostics() {
+        lifecycleScope.launch {
+            runCatching {
+                val f = Diag.build(this@MainActivity, prefs)
+                shareFile(f, "text/plain", "分享诊断信息")
+            }.onFailure { toast("生成诊断信息失败：${it.message}") }
+        }
     }
 
     private fun shareLog() {
