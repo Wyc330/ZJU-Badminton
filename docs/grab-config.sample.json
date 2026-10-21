@@ -33,6 +33,14 @@
   "companionName": "",
   "inviteCodeWaitMs": 120000,
 
+  "autoPay": true,
+  "captchaWaitMs": 120000,
+  "payWaitMs": 25000,
+  "stepWatchdogMs": 90000,
+  "noticeTexts": ["预约须知", "温馨提示", "弹窗将在", "秒后关闭"],
+  "noticeCloseXRatio": 0.868,
+  "noticeCloseYRatio": 0.671,
+
   "entryService": [
     { "id": "tv_home_model_title", "contains": "场馆服务" },
     { "contains": "场馆服务" }

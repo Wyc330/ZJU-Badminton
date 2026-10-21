@@ -79,6 +79,11 @@ class Prefs private constructor(context: Context) {
         get() = sp.getLong("last_run_at", 0L)
         set(v) = sp.edit().putLong("last_run_at", v).apply()
 
+    /** 上次成功预约的订单摘要（订单号/日期/时段/场地号），用于结果提示与落盘 */
+    var lastOrderInfo: String
+        get() = sp.getString("last_order_info", "").orEmpty()
+        set(v) = sp.edit().putString("last_order_info", v).apply()
+
     /** 直连成功时的详情（日期/时段/场地），用于结果展示与通知 */
     var lastDirectDetail: String
         get() = sp.getString("last_direct_detail", "").orEmpty()
@@ -98,6 +103,11 @@ class Prefs private constructor(context: Context) {
     var guideShown: Boolean
         get() = sp.getBoolean("guide_shown", false)
         set(v) = sp.edit().putBoolean("guide_shown", v).apply()
+
+    /** 临时指定目标日期（yyyy-MM-dd，仅调试/临时测试用，空=按放号规则算） */
+    var debugTargetDate: String
+        get() = sp.getString("debug_target_date", "").orEmpty()
+        set(v) = sp.edit().putString("debug_target_date", v).apply()
 
     /** 上次静默续期尝试时间（避免反复拉起） */
     var lastSilentRefreshAt: Long

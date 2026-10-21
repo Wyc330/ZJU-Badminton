@@ -25,10 +25,13 @@ object AlarmScheduler {
 
     const val ACTION_DAILY_FIRE = "com.zju.courtgrab.action.DAILY_FIRE"
     const val ACTION_PREWARM = "com.zju.courtgrab.action.PREWARM"
+    /** 锁屏时排队等的重试闹钟（每分钟一次，最多 6 次） */
+    const val ACTION_RETRY = "com.zju.courtgrab.action.RETRY"
 
     private const val TAG = "Alarm"
     private const val REQUEST_CODE = 2001
     private const val REQUEST_CODE_PREWARM = 2002
+    private const val REQUEST_CODE_RETRY = 2003
     /** 放号前多少分钟做预热（续期登录态） */
     private const val PREWARM_BEFORE_MINUTES = 12L
     private val fmt: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
@@ -87,6 +90,33 @@ object AlarmScheduler {
         context.applicationContext,
         REQUEST_CODE_PREWARM,
         Intent(context, PrewarmReceiver::class.java).setAction(ACTION_PREWARM),
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+    )
+
+    /** 锁屏等解锁：delayMs 后重试一次（带 attempt 计数） */
+    fun scheduleRetry(context: Context, delayMs: Long, attempt: Int) {
+        val am = context.getSystemService(AlarmManager::class.java) ?: return
+        val at = System.currentTimeMillis() + delayMs
+        val exact = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) am.canScheduleExactAlarms() else true
+        runCatching {
+            if (exact) {
+                am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, retryIntent(context, attempt))
+            } else {
+                am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, retryIntent(context, attempt))
+            }
+            Logs.i(TAG, "已排解锁重试：第 $attempt 次（${fmt.format(LocalDateTime.now().plusSeconds(delayMs / 1000))}）")
+        }.onFailure { Logs.e(TAG, "排解锁重试失败", it) }
+    }
+
+    fun cancelRetry(context: Context) {
+        val am = context.getSystemService(AlarmManager::class.java) ?: return
+        runCatching { am.cancel(retryIntent(context, 0)) }
+    }
+
+    private fun retryIntent(context: Context, attempt: Int): PendingIntent = PendingIntent.getBroadcast(
+        context.applicationContext,
+        REQUEST_CODE_RETRY,
+        Intent(context, BookingAlarmReceiver::class.java).setAction(ACTION_RETRY).putExtra("attempt", attempt),
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )
 

@@ -187,6 +187,9 @@ object ConfigJson {
         put("targetActivity", cfg.targetActivity)
         put("launchTimeoutMs", cfg.launchTimeoutMs)
         put("popupClosers", locatorsToJson(cfg.popupClosers))
+        put("captchaHints", locatorsToJson(cfg.captchaHints))
+        put("btnPay", locatorsToJson(cfg.btnPay))
+        put("payConfirm", locatorsToJson(cfg.payConfirm))
         put("popupRounds", cfg.popupRounds)
         put("homeReady", locatorsToJson(cfg.homeReady))
         put("loginHints", locatorsToJson(cfg.loginHints))
@@ -251,6 +254,13 @@ object ConfigJson {
         put("screenshotIntervalMs", cfg.screenshotIntervalMs)
         put("inviteCodeWaitMs", cfg.inviteCodeWaitMs)
         put("submitVerifyMs", cfg.submitVerifyMs)
+        put("autoPay", cfg.autoPay)
+        put("captchaWaitMs", cfg.captchaWaitMs)
+        put("payWaitMs", cfg.payWaitMs)
+        put("stepWatchdogMs", cfg.stepWatchdogMs)
+        put("noticeTexts", JSONArray(cfg.noticeTexts))
+        put("noticeCloseXRatio", cfg.noticeCloseXRatio.toDouble())
+        put("noticeCloseYRatio", cfg.noticeCloseYRatio.toDouble())
     }
 
     fun merge(base: GrabConfig, json: JSONObject): GrabConfig {
@@ -264,6 +274,9 @@ object ConfigJson {
         targetActivity = json.str("targetActivity", base.targetActivity),
         launchTimeoutMs = json.lng("launchTimeoutMs", base.launchTimeoutMs),
         popupClosers = json.locators("popupClosers", base.popupClosers),
+        captchaHints = json.locators("captchaHints", base.captchaHints),
+        btnPay = json.locators("btnPay", base.btnPay),
+        payConfirm = json.locators("payConfirm", base.payConfirm),
         popupRounds = json.int("popupRounds", base.popupRounds),
         homeReady = json.locators("homeReady", base.homeReady),
         loginHints = json.locators("loginHints", base.loginHints),
@@ -333,5 +346,12 @@ object ConfigJson {
         screenshotIntervalMs = json.lng("screenshotIntervalMs", base.screenshotIntervalMs),
         inviteCodeWaitMs = json.lng("inviteCodeWaitMs", base.inviteCodeWaitMs),
         submitVerifyMs = json.lng("submitVerifyMs", base.submitVerifyMs),
+        autoPay = json.optBoolean("autoPay", base.autoPay),
+        captchaWaitMs = json.lng("captchaWaitMs", base.captchaWaitMs),
+        payWaitMs = json.lng("payWaitMs", base.payWaitMs),
+        stepWatchdogMs = json.lng("stepWatchdogMs", base.stepWatchdogMs),
+        noticeTexts = json.stringList("noticeTexts") ?: base.noticeTexts,
+        noticeCloseXRatio = json.optDouble("noticeCloseXRatio", base.noticeCloseXRatio.toDouble()).toFloat(),
+        noticeCloseYRatio = json.optDouble("noticeCloseYRatio", base.noticeCloseYRatio.toDouble()).toFloat(),
     )
 }

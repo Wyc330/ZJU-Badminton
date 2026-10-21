@@ -113,7 +113,14 @@ class VenueAccessibilityService : AccessibilityService() {
                 Notify.showFlowRunning(applicationContext, "正在自动预约…")
                 BookingFlow(this@VenueAccessibilityService, trigger).run()
                 success = true
-                message = "预约流程执行完成，请到「浙大体艺-我的预约」确认结果"
+                val p = com.zju.courtgrab.core.Prefs.get(applicationContext)
+                val order = p.lastOrderInfo.trim()
+                val direct = p.lastDirectDetail.trim()
+                message = when {
+                    order.isNotEmpty() -> "预约成功：$order"
+                    direct.isNotEmpty() -> "直连下单成功：$direct"
+                    else -> "预约流程执行完成，请到「浙大体艺-我的预约」确认结果"
+                }
             } catch (e: FlowException) {
                 message = "流程失败于「${e.step}」：${humanize(e.message)}"
                 Logs.e(TAG, "流程失败：${e.step}：${e.message}", e.cause)

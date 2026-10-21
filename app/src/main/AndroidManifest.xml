@@ -98,6 +98,7 @@
             android:exported="false">
             <intent-filter>
                 <action android:name="com.zju.courtgrab.action.DAILY_FIRE" />
+                <action android:name="com.zju.courtgrab.action.RETRY" />
             </intent-filter>
         </receiver>
 

@@ -53,7 +53,9 @@ object DirectBookingFlow {
         }
 
         val now = LocalDateTime.now()
-        val date = DatePlanner.resolveTargetDate(now, cfg.dateCfg, cfg.releaseHour, cfg.releaseMinute)
+        val date = prefs.debugTargetDate.trim().takeIf { it.isNotEmpty() }
+            ?.let { runCatching { java.time.LocalDate.parse(it) }.getOrNull() }
+            ?: DatePlanner.resolveTargetDate(now, cfg.dateCfg, cfg.releaseHour, cfg.releaseMinute)
         if (date == null) {
             Logs.w(TAG, "预约窗口内没有目标日期，回退界面流程")
             return false

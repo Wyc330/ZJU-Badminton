@@ -34,6 +34,13 @@ data class GrabConfig(
         Locator(textContains = "暂不"),
         Locator(textContains = "跳过"),
     ),
+    /**
+     * 预约须知弹窗识别词。H5 弹窗的「关闭」按钮有时不暴露成无障碍节点，
+     * 检测到这些词时用相对坐标兜底点击（实测按钮在屏幕 86.8% / 67.1% 处）。
+     */
+    val noticeTexts: List<String> = listOf("预约须知", "温馨提示", "弹窗将在", "秒后关闭"),
+    val noticeCloseXRatio: Float = 0.868f,
+    val noticeCloseYRatio: Float = 0.671f,
     val popupRounds: Int = 3,
 
     // ③ 首页 / 登录态 ────────────────────────────────────────────────────────
@@ -262,6 +269,22 @@ data class GrabConfig(
     val btnSubmitOrder: List<Locator> = listOf(
         Locator(textContains = "提交订单", note = "实测"),
     ),
+    /** 实测：提交后弹「请完成安全验证」（按顺序点选字符），应用无法自动完成，需要人工接力 */
+    val captchaHints: List<Locator> = listOf(
+        Locator(textContains = "安全验证", note = "实测：请完成安全验证"),
+        Locator(textContains = "请依次点击", note = "实测：验证码操作说明"),
+        Locator(textContains = "完成验证"),
+    ),
+    /** 实测：订单页底部橙色「支付」，金额 ¥0 也必须点，否则 3 分钟内自动取消 */
+    val btnPay: List<Locator> = listOf(
+        Locator(textEquals = "支付", note = "实测：¥0 订单底部按钮"),
+        Locator(textContains = "立即支付"),
+    ),
+    val payConfirm: List<Locator> = listOf(
+        Locator(textEquals = "确认支付"),
+        Locator(textContains = "确认支付"),
+        Locator(textEquals = "确认"),
+    ),
 
     // ⑮ 结果判定 ─────────────────────────────────────────────────────────────
     val successSigns: List<Locator> = listOf(
@@ -290,6 +313,14 @@ data class GrabConfig(
     val screenshotIntervalMs: Long = 330,
     val inviteCodeWaitMs: Long = 120_000,
     val submitVerifyMs: Long = 8_000,
+    /** 提交后自动点「支付」（¥0 也必须点，否则订单 3 分钟内取消） */
+    val autoPay: Boolean = true,
+    /** 等人工完成验证码的最长时间 */
+    val captchaWaitMs: Long = 120_000,
+    /** 支付后等「预约成功」页的最长时间 */
+    val payWaitMs: Long = 25_000,
+    /** 单步看门狗：任何一步超过该时长直接判失败（避免静默卡死） */
+    val stepWatchdogMs: Long = 90_000,
 ) {
 
     fun summary(): String = buildString {
@@ -317,6 +348,10 @@ data class GrabConfig(
         appendLine("btnBookNow           = ${btnBookNow.joinToString { it.describe() }}")
         appendLine("companionName        = ${if (companionName.isBlank()) "(留空=第一个同伴)" else companionName}")
         appendLine("btnSubmitOrder       = ${btnSubmitOrder.joinToString { it.describe() }}")
+        appendLine("btnPay               = ${btnPay.joinToString { it.describe() }}")
+        appendLine("captchaHints         = ${captchaHints.joinToString { it.describe() }}")
+        appendLine("autoPay              = $autoPay（¥0 也必须点，否则 3 分钟取消）")
+        appendLine("stepWatchdogMs       = $stepWatchdogMs")
         appendLine("stepTimeoutMs        = $stepTimeoutMs")
     }
 

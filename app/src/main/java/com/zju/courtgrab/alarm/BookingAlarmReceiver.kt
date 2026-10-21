@@ -39,6 +39,35 @@ class BookingAlarmReceiver : BroadcastReceiver() {
         runCatching { AlarmScheduler.schedule(context, prefs) }
             .onFailure { Logs.e(TAG, "排下一次失败", it) }
 
+        // 1.5) 锁屏处理：安全锁屏无法由应用代解，排队等解锁（每分钟重试，最多 6 次）
+        val attempt = intent?.getIntExtra("attempt", 0) ?: 0
+        val km = context.getSystemService(android.app.KeyguardManager::class.java)
+        if (km != null && km.isKeyguardLocked) {
+            Logs.w(TAG, "手机锁屏中（第 ${attempt + 1} 次检查）")
+            runCatching {
+                context.startActivity(
+                    Intent(context, com.zju.courtgrab.ui.UnlockActivity::class.java)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION),
+                )
+            }
+            if (attempt < 6) {
+                Notify.showPrepReminder(
+                    context,
+                    "手机锁屏中，等待解锁",
+                    "9:00 放号需要解锁手机。解锁后会自动继续（每分钟自动检查一次，最多等 6 分钟）。",
+                )
+                AlarmScheduler.scheduleRetry(context, 60_000, attempt + 1)
+                return
+            }
+            Logs.e(TAG, "等待解锁超时（6 分钟），本次放弃")
+            Notify.showResult(context, false, "手机一直锁屏，本次自动抢场地未能执行（请解锁后再等下一次放号）")
+            return
+        }
+        if (intent?.action == AlarmScheduler.ACTION_RETRY) {
+            Logs.i(TAG, "解锁重试：手机已解锁，继续执行")
+        }
+        AlarmScheduler.cancelRetry(context)
+
         // 2. 无障碍必须开着
         if (!Perms.isA11yEnabled(context)) {
             Logs.e(TAG, "无障碍服务未开启，无法执行自动预约")

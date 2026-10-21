@@ -42,6 +42,47 @@ class DebugTriggerReceiver : BroadcastReceiver() {
             return
         }
 
+        // 配置类调试动作：同伴/同伴码/时间段/模式，全部在 receiver 内完成
+        if (action in setOf("set_companion", "set_code", "set_slot", "set_date", "state", "direct_on", "direct_off")) {
+            runCatching {
+                val prefs = com.zju.courtgrab.core.Prefs.get(context)
+                when (action) {
+                    "set_companion" -> {
+                        prefs.companionName = intent.getStringExtra("name").orEmpty()
+                        Logs.i("DebugTrigger", "同伴姓名=${prefs.companionName}")
+                    }
+                    "set_code" -> {
+                        prefs.inviteCode = intent.getStringExtra("code").orEmpty().filter { it.isDigit() }.take(5)
+                        prefs.buddyCodeInvalidAt = 0L
+                        Logs.i("DebugTrigger", "同伴码已设置（${prefs.inviteCode.length} 位）")
+                    }
+                    "set_slot" -> {
+                        prefs.preferredSlotStart = intent.getStringExtra("slot").orEmpty()
+                        Logs.i("DebugTrigger", "目标时间段=${prefs.preferredSlotStart}")
+                    }
+                    "set_date" -> {
+                        prefs.debugTargetDate = intent.getStringExtra("date").orEmpty()
+                        Logs.i("DebugTrigger", "指定目标日期=${prefs.debugTargetDate.ifBlank { "(清除，按放号规则)" }}")
+                    }
+                    "direct_on" -> { prefs.directMode = true; Logs.i("DebugTrigger", "直连模式=开") }
+                    "direct_off" -> { prefs.directMode = false; Logs.i("DebugTrigger", "直连模式=关") }
+                    "state" -> Logs.i(
+                        "DebugTrigger",
+                        "当前配置：同伴=${prefs.companionName} 码长=${prefs.inviteCode.length} " +
+                            "时间段=${prefs.preferredSlotStart} 演练=${prefs.dryRun} 直连=${prefs.directMode} " +
+                            "启用=${prefs.enabled} 目标日期=${
+                                com.zju.courtgrab.core.DatePlanner.resolveTargetDate(
+                                    java.time.LocalDateTime.now(),
+                                    com.zju.courtgrab.core.ConfigRepo.load(context).dateCfg,
+                                    prefs.alarmHour, prefs.alarmMinute,
+                                )
+                            }",
+                    )
+                }
+            }.onFailure { Logs.w("DebugTrigger", "配置动作失败：${it.message}") }
+            return
+        }
+
         // 开关类调试动作：直接在 receiver 内完成，不拉起界面
         if (action in setOf("enable_on", "enable_off", "dryrun_on", "dryrun_off")) {
             runCatching {

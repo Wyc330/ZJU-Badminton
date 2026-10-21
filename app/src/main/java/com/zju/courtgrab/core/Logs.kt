@@ -26,7 +26,9 @@ object Logs {
 
     fun init(context: Context) {
         runCatching {
-            val dir = File(context.filesDir, "logs").apply { mkdirs() }
+            // 优先外部私有目录（/sdcard/Android/data/<pkg>/files/logs），方便 adb pull 排查
+            val ext = context.getExternalFilesDir("logs")
+            val dir = (ext ?: File(context.filesDir, "logs")).apply { mkdirs() }
             logFile = File(dir, "run-${dayStamp.format(Date())}.log")
         }
     }

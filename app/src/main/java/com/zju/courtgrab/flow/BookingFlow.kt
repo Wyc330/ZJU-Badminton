@@ -29,7 +29,10 @@ import com.zju.courtgrab.core.TapCache
 import com.zju.courtgrab.direct.DirectBookingFlow
 import com.zju.courtgrab.util.BgLaunch
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeout
+import com.zju.courtgrab.core.OutcomeParser
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -117,6 +120,7 @@ class BookingFlow(
 
     suspend fun run() {
         cfg = ConfigRepo.load(ctx)
+        prefs.lastOrderInfo = ""
         Logs.i(TAG, "配置摘要:\n${cfg.summary()}")
         Logs.i(TAG, "触发来源=$trigger，时间=${Logs.fullTime()}")
 
@@ -187,7 +191,7 @@ class BookingFlow(
         // 预热 2：放号前先试着把日期切到目标（有些时段窗口提前就允许切，
         // 这样 09:00:00 之后只剩「刷新 → 点格子」两件事）
         if (cfg.turboMode) {
-            val warmDate = DatePlanner.resolveTargetDate(
+            val warmDate = overrideTargetDate() ?: DatePlanner.resolveTargetDate(
                 LocalDateTime.now(), cfg.dateCfg, cfg.releaseHour, cfg.releaseMinute,
             )
             if (warmDate != null) {
@@ -204,8 +208,12 @@ class BookingFlow(
         step("⑫½ 等到 ${cfg.releaseHour}:${"%02d".format(cfg.releaseMinute)} 放号") { waitForRelease() }
 
         val now = LocalDateTime.now()
-        val target = DatePlanner.resolveTargetDate(now, cfg.dateCfg, cfg.releaseHour, cfg.releaseMinute)
+        val target = overrideTargetDate()
+            ?: DatePlanner.resolveTargetDate(now, cfg.dateCfg, cfg.releaseHour, cfg.releaseMinute)
             ?: throw FlowException("选择日期", "算不出目标日期（检查 dateCfg 配置）")
+        if (target != DatePlanner.resolveTargetDate(now, cfg.dateCfg, cfg.releaseHour, cfg.releaseMinute)) {
+            Logs.w(TAG, "使用「指定目标日期」覆盖：$target")
+        }
         val candidates = listOf(target)
         Log("目标日期（待开票的最近一天）：$target（${DatePlanner.weekdayCn(target.dayOfWeek)}）")
         Notify("开始抢 ${candidates.first()} 的场")
@@ -250,10 +258,13 @@ class BookingFlow(
                     tapCached("submit", cfg.btnSubmitOrder, "提交订单")
                     delay(cfg.afterNavDelayMs)
                 }
-                step("⑳ 确认结果") { verifyResult() }
+                step("⑳ 等待验证码（如需人工点选）") { waitCaptchaIfAny() }
+                step("㉑ 支付确认（¥0 也必须点）") { payIfNeeded() }
+                step("㉒ 确认预约成功并记录订单") { verifyAndParseResult() }
 
-                prefs.lastResult = "成功 ${Logs.fullTime()}（$actual ${pick.cell.rowLabel}）"
-                Notify("预约流程完成：$actual ${pick.cell.rowLabel}")
+                val order = prefs.lastOrderInfo.ifBlank { "$actual ${pick.cell.rowLabel}" }
+                prefs.lastResult = "成功 ${Logs.fullTime()}（$order）"
+                Notify("预约成功：$order")
                 return
             } catch (e: FlowException) {
                 lastError = e
@@ -269,6 +280,14 @@ class BookingFlow(
 
     // ─────────────────────────── 前置 ───────────────────────────
 
+    /** 调试/临时指定日期覆盖（Prefs.debugTargetDate，yyyy-MM-dd） */
+    private fun overrideTargetDate(): java.time.LocalDate? =
+        prefs.debugTargetDate.trim().takeIf { it.isNotEmpty() }?.let {
+            runCatching { java.time.LocalDate.parse(it) }
+                .onFailure { e -> Logs.w(TAG, "debugTargetDate 解析失败：${it}（${e.message}）") }
+                .getOrNull()
+        }
+
     private suspend fun launchTarget() {
         // 锁屏时先把非安全锁屏解除，否则目标 App 起不来（安全锁屏只能用户本人解锁）
         runCatching {
@@ -282,19 +301,29 @@ class BookingFlow(
             Log("目标 App 已在前台")
             return
         }
-        if (!BgLaunch.openTarget(ctx, cfg)) {
+        var launched = false
+        repeat(2) { attempt ->
+            if (!launched) {
+                launched = BgLaunch.openTarget(ctx, cfg)
+                if (!launched) {
+                    Logs.w(TAG, "第 ${attempt + 1} 次拉起目标 App 失败")
+                }
+            }
+            val deadline = SystemClock.elapsedRealtime() + cfg.navTimeoutMs
+            while (SystemClock.elapsedRealtime() < deadline) {
+                if (ops.foregroundPackage() == cfg.targetPackage) {
+                    Log("目标 App 已到前台（第 ${attempt + 1} 次尝试）")
+                    return
+                }
+                delay(cfg.pollIntervalMs)
+            }
+            Logs.w(TAG, "目标 App 没到前台（第 ${attempt + 1} 次），重试拉起")
+        }
+        if (!launched) {
             throw FlowException(
                 "启动目标 App",
                 "startActivity 被拦截：请到「设置-应用-抢场地-显示在其他应用上层」打开悬浮窗权限",
             )
-        }
-        val deadline = SystemClock.elapsedRealtime() + cfg.navTimeoutMs
-        while (SystemClock.elapsedRealtime() < deadline) {
-            if (ops.foregroundPackage() == cfg.targetPackage) {
-                Log("目标 App 已到前台")
-                return
-            }
-            delay(cfg.pollIntervalMs)
         }
         Log("未确认到前台（当前=${ops.foregroundPackage() ?: "?"}），继续等首页")
     }
@@ -313,7 +342,22 @@ class BookingFlow(
                 hitLocator = loc
                 break
             }
-            if (hit == null) return
+            if (hit == null) {
+                // 预约须知：H5 弹窗的按钮常常不作为无障碍节点暴露，用相对坐标兜底
+                val noticeHit = snaps.any { n ->
+                    val t = (n.text ?: "") + " " + (n.desc ?: "")
+                    cfg.noticeTexts.any { t.contains(it) }
+                }
+                if (noticeHit) {
+                    val x = (screenW * cfg.noticeCloseXRatio).toInt()
+                    val y = (screenH * cfg.noticeCloseYRatio).toInt()
+                    Log("检测到预约须知弹窗，按相对坐标关闭 ($x, $y)")
+                    ops.tapFast(x.toFloat(), y.toFloat())
+                    delay(450)
+                    return@repeat
+                }
+                return
+            }
             Log("关闭弹窗（匹配 ${hitLocator?.describe()}）：${hit.snap.summary()}")
             ops.click(hit, 250)
             delay(250)
@@ -321,7 +365,17 @@ class BookingFlow(
     }
 
     private suspend fun waitHome() {
-        val node = ops.waitFor(cfg.homeReady, cfg.navTimeoutMs, cfg.pollIntervalMs)
+        var node = ops.waitFor(cfg.homeReady, cfg.navTimeoutMs, cfg.pollIntervalMs)
+        // 目标 App 可能停在 H5 页面（WebView）：连续返回几次回首页
+        var backTimes = 0
+        while (node == null && backTimes < 3) {
+            backTimes++
+            Logs.w(TAG, "  等不到首页，返回一次重试（第 $backTimes 次）")
+            ops.back()
+            delay(900)
+            dismissPopups()
+            node = ops.waitFor(cfg.homeReady, 2500, cfg.pollIntervalMs)
+        }
         if (node == null) {
             if (isLoginPage()) {
                 throw FlowException("等待首页", "登录态疑似失效，请先手动打开浙大体艺登录一次")
@@ -380,11 +434,18 @@ class BookingFlow(
                 Log("  ✔ 学习坐标生效 → ${ready.snap.summary()}")
                 return true
             }
-            Logs.w(TAG, "  $name：学习坐标没生效，回退正常定位")
+            Logs.w(TAG, "  $name：学习坐标没生效，删除并回退正常定位")
+            tapCache.remove(cacheKey)
+            TapCache.save(prefs, tapCache)
         }
         val deadline = SystemClock.elapsedRealtime() + timeoutMs
+        var round = 0
         do {
+            round++
             val nodes = ops.collect()
+            if (round == 1 || round % 3 == 0) {
+                Logs.w(TAG, "  $name：第 $round 轮定位（节点 ${nodes.size} 个）")
+            }
             val snaps = nodes.map { it.snap }
             for (loc in locs) {
                 if (loc.isEmpty) continue
@@ -1139,18 +1200,79 @@ class BookingFlow(
         delay(250)
     }
 
-    private suspend fun verifyResult() {
-        val failNode = ops.waitFor(cfg.failureSigns, 900, 150)
-        if (failNode != null) {
-            throw FlowException("提交订单", "出现失败提示：${failNode.snap.text ?: failNode.snap.desc}")
+    /**
+     * 提交后可能弹「请完成安全验证」（字符点选，应用无解）。
+     * 策略：检测到就响铃+高优先级通知，等用户点完（最多 captchaWaitMs），点完自动继续。
+     */
+    private suspend fun waitCaptchaIfAny() {
+        val hint = ops.waitFor(cfg.captchaHints, 1_500, 120)
+        if (hint == null) {
+            Log("没有验证码，继续")
+            return
         }
-        val okNode = ops.waitFor(cfg.successSigns, cfg.submitVerifyMs, 250)
-        if (okNode != null) {
-            Log("✅ 成功标志：${okNode.snap.text ?: okNode.snap.desc}")
-        } else {
-            Logs.w(TAG, "⚠ 没看到明确成功标志，请到「我的预约」确认；界面文字=${ops.visibleTextDigest()}")
+        Logs.w(TAG, "⚠ 检测到安全验证（${hint.snap.text ?: hint.snap.desc}），等待人工点选，最多 ${cfg.captchaWaitMs / 1000}s")
+        runCatching {
+            com.zju.courtgrab.util.Notify.showPrepReminder(
+                ctx,
+                "需要你完成安全验证",
+                "请在手机上按顺序点选验证码字符，点完会自动继续（最多等 2 分钟）。",
+            )
+            com.zju.courtgrab.util.Notify.vibrateDone(ctx, true)
         }
-        Log("按你的要求：不进行支付，流程到此结束")
+        val deadline = SystemClock.elapsedRealtime() + cfg.captchaWaitMs
+        while (SystemClock.elapsedRealtime() < deadline) {
+            delay(1_200)
+            if (ops.waitFor(cfg.captchaHints, 900, 120) == null) {
+                Log("✔ 验证码已完成，继续支付/确认")
+                return
+            }
+        }
+        throw FlowException("提交订单", "等待人工完成安全验证超时（${cfg.captchaWaitMs / 1000}s）")
+    }
+
+    /** 提交成功后出现「支付」（¥0 也要点，否则 3 分钟内自动取消） */
+    private suspend fun payIfNeeded() {
+        if (!cfg.autoPay) {
+            Log("autoPay=false，跳过支付")
+            return
+        }
+        val pay = ops.waitFor(cfg.btnPay, 3_500, 150)
+        if (pay == null) {
+            Log("没看到「支付」按钮（可能直接成功/无需支付），继续确认结果")
+            return
+        }
+        Log("点击支付：${pay.snap.summary()}")
+        ops.click(pay, 200)
+        delay(1_600)
+        val confirm = ops.waitFor(cfg.payConfirm, 2_500, 150)
+        if (confirm != null) {
+            Log("确认支付：${confirm.snap.summary()}")
+            ops.click(confirm, 200)
+            delay(1_600)
+        }
+    }
+
+    /** 结果判定 + 解析订单号/日期/时段/场地号，成功后写入 lastOrderInfo */
+    private suspend fun verifyAndParseResult() {
+        val deadline = SystemClock.elapsedRealtime() + cfg.payWaitMs
+        var lastText = ""
+        while (SystemClock.elapsedRealtime() < deadline) {
+            val failNode = ops.waitFor(cfg.failureSigns, 400, 100)
+            if (failNode != null) {
+                throw FlowException("提交订单", "失败提示：${failNode.snap.text ?: failNode.snap.desc}")
+            }
+            lastText = runCatching { ops.visibleTextDigest() }.getOrDefault("")
+            val okNode = ops.waitFor(cfg.successSigns, 500, 100)
+            if (okNode != null || OutcomeParser.isSuccess(lastText)) {
+                val info = OutcomeParser.parseOrder(lastText)
+                val detail = info.describe()
+                prefs.lastOrderInfo = detail
+                Log("✅ 预约成功：$detail")
+                return
+            }
+            delay(600)
+        }
+        throw FlowException("确认结果", "没看到「预约成功」，当前界面：${lastText.take(140)}")
     }
 
     // ─────────────────────────── 恢复 / 工具 ───────────────────────────
@@ -1191,7 +1313,12 @@ class BookingFlow(
         Log("▶ $name")
         val t0 = SystemClock.elapsedRealtime()
         val result = try {
-            block()
+            // 看门狗：任何一步卡死超过 stepWatchdogMs 就判失败，避免「看起来在跑其实卡住」
+            withTimeout(cfg.stepWatchdogMs) { block() }
+        } catch (e: TimeoutCancellationException) {
+            val digest = runCatching { ops.visibleTextDigest() }.getOrDefault("")
+            Logs.e(TAG, "  ⏱ $name 超过 ${cfg.stepWatchdogMs / 1000}s 未完成，界面文字=$digest")
+            throw FlowException(name, "步骤超时（>${cfg.stepWatchdogMs / 1000}s），疑似页面无响应/卡住")
         } catch (e: FlowException) {
             throw e
         } catch (e: CancellationException) {
