@@ -43,7 +43,7 @@ class DebugTriggerReceiver : BroadcastReceiver() {
         }
 
         // 配置类调试动作：同伴/同伴码/时间段/模式，全部在 receiver 内完成
-        if (action in setOf("set_companion", "set_code", "set_slot", "set_date", "state", "direct_on", "direct_off")) {
+        if (action in setOf("set_companion", "set_code", "clear_code", "set_slot", "set_date", "state", "direct_on", "direct_off")) {
             runCatching {
                 val prefs = com.zju.courtgrab.core.Prefs.get(context)
                 when (action) {
@@ -55,6 +55,11 @@ class DebugTriggerReceiver : BroadcastReceiver() {
                         prefs.inviteCode = intent.getStringExtra("code").orEmpty().filter { it.isDigit() }.take(5)
                         prefs.buddyCodeInvalidAt = 0L
                         Logs.i("DebugTrigger", "同伴码已设置（${prefs.inviteCode.length} 位）")
+                    }
+                    "clear_code" -> {
+                        prefs.inviteCode = ""
+                        prefs.buddyCodeInvalidAt = 0L
+                        Logs.i("DebugTrigger", "已清空同伴码（等新的 5 位码）")
                     }
                     "set_slot" -> {
                         prefs.preferredSlotStart = intent.getStringExtra("slot").orEmpty()
